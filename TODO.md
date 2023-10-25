@@ -7,7 +7,7 @@
 
 [Samarth] identify states with high variance actions
 
-[Samarth] figure out which trajecteries to prune
+[Samarth] figure out which trajectories to prune
 
     - decide horizon to use in comparing indifference vs uncertainty
 
