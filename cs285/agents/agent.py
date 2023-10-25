@@ -2,7 +2,7 @@ import torch
 from torch import nn, optim
 import numpy as np
 from networks.mlp import MLP
-from infrastructure.utils import *
+from cs285.infrastructure.pytorch_utils import *
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
