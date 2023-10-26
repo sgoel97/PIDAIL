@@ -47,7 +47,7 @@ class Trajectory:
                 similarity = self.get_state(i).compare(other.get_state(j))
                 if similarity > Trajectory.similarity_threshold:
                     self_states.append(i)
-                    other_states[1].append(j)
+                    other_states.append(j)
         return self_states, other_states
 
 
