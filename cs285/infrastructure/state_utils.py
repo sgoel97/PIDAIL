@@ -23,7 +23,7 @@ class State:
     
 
 class Trajectory:
-    similarity_threshold = 0.7  # TODO: currently arbitrary; I found this by looking at the similarity distribution in the Hopper expert data
+    similarity_threshold = 0.8  # TODO: currently arbitrary; I found this by looking at the similarity distribution in the Hopper expert data
 
     def __init__(self):
         self.states = []
@@ -40,14 +40,15 @@ class Trajectory:
     def compare(self, other):
         n = len(self)
         m = len(other)
-        avg_similarity = 0
-        num_comparisons = 0
+        self_states = []
+        other_states = []
         for i in tqdm(range(n)):
             for j in range(m):
-                avg_similarity += self.get_state(i).compare(other.get_state(j))
-                num_comparisons += 1
-        avg_similarity /= num_comparisons
-        return avg_similarity
+                similarity = self.get_state(i).compare(other.get_state(j))
+                if similarity > Trajectory.similarity_threshold:
+                    self_states.append(i)
+                    other_states[1].append(j)
+        return self_states, other_states
 
 
 def create_trajectories(expert_file_path):
@@ -94,7 +95,9 @@ def get_similar_states(trajectories):
     similar_states = []
     for i in range(num_traj):
         for j in range(i + 1, num_traj):
-            _ = trajectories[i].compare(trajectories[j])
+            i_states, j_states = trajectories[i].compare(trajectories[j])
+            for k in range(len(i_states)):
+                similar_states.extend([(i, i_states[k]), (j, j_states[k])])
     return similar_states
 
 
