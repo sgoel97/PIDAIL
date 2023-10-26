@@ -1,17 +1,78 @@
 import torch
+import pickle
+import numpy as np
+from tqdm import tqdm
 
 
-# TODO: Maybe we use the below as a state definition?
+class State:
+    similarity_weight = 0.5
 
-# class State:
-#     def __init__(self, obs, action, next_obs, reward, done):
-#         self.obs = obs
-#         self.action = action
-#         self.next_obs = next_obs
-#         self.reward = reward
-#         self.done = done
+    def __init__(self, obs, action, next_obs, reward):
+        self.obs = obs
+        self.action = action
+        self.next_obs = next_obs
+        self.reward = reward
+    
+    def compare(self, other):
+        dot = np.dot(self.obs, other.obs)
+        self_obs_norm = np.linalg.norm(self.obs)
+        other_obs_norm = np.linalg.norm(other.obs)
+        obs_similarity = dot / (self_obs_norm * other_obs_norm)
+        reward_similarity = (self.reward - other.reward)
+        return State.similarity_weight * obs_similarity + (1 - State.similarity_weight) * reward_similarity
+    
+
+class Trajectory:
+    similarity_threshold = 0.7  # TODO: currently arbitrary; I found this by looking at the similarity distribution in the Hopper expert data
+
+    def __init__(self):
+        self.states = []
+    
+    def __len__(self):
+        return len(self.states)
+    
+    def add_state(self, state):
+        self.states.append(state)
+    
+    def get_state(self, idx):
+        return self.states[idx]
+    
+    def compare(self, other):
+        n = len(self)
+        m = len(other)
+        avg_similarity = 0
+        num_comparisons = 0
+        for i in tqdm(range(n)):
+            for j in range(m):
+                avg_similarity += self.get_state(i).compare(other.get_state(j))
+                num_comparisons += 1
+        avg_similarity /= num_comparisons
+        return avg_similarity
 
 
+def create_trajectories(expert_file_path):
+    """
+    The expert data files are formatted such that each one is a list of demos of length n = 2.
+    Each demo has batch_size observations, batch_size actions, batch_size next_observations, etc.
+    We define that one demo is one trajectory (which is a standard definition if we assume that
+    the expert data files ARE giving us n trajectories).
+    Thus the ith state along a trajectory will be made of the obs, action, next_obs, reward, and
+    done located at the ith index in their respective arrays.
+    """
+    with open(expert_file_path, "rb") as f:
+        demos = pickle.load(f)
+    trajectories = []
+    batch_size = demos[0]["observation"].shape[0]
+    for demo in demos:
+        trajectory = Trajectory()
+        for b in range(batch_size):
+            state = State(demo["observation"][b], demo["action"][b], demo["next_observation"][b], demo["reward"][b])
+            trajectory.add_state(state)
+        trajectories.append(trajectory)
+    return trajectories
+
+
+# FIXME: don't think this function is necessary now
 def get_action(state, next_state):
     """
     TODO: Need to define what a state is lmao
@@ -21,20 +82,20 @@ def get_action(state, next_state):
     return 0
 
 
-# TODO: Refactor to work with finalized state definition
-
-
 def get_similar_states(trajectories):
     """
-    TODO: Aggregates similar states from a list of trajectories
-
     params:
-        trajectories: iniiial expert trajectories to aggregate
+        trajectories: initial expert trajectories to aggregate
     returns:
         similar_states: list of states that are similar to each other. This is a list of
         tuples where the first element is the index of the trajectory and the second element is the index of the observation.
     """
-    return []
+    num_traj = len(trajectories)
+    similar_states = []
+    for i in range(num_traj):
+        for j in range(i + 1, num_traj):
+            _ = trajectories[i].compare(trajectories[j])
+    return similar_states
 
 
 def get_state_variance(state, agent, n_iters=100):
