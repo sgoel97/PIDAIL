@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class ReplayBuffer:
     def __init__(self, capacity = 10000):
         self.capacity = capacity
@@ -24,7 +27,7 @@ class ReplayBuffer:
         if self.observations is None:
             self.observations = np.empty((self.capacity, *obs.shape), dtype = obs.dtype)
             self.actions = np.empty((self.capacity, *action.shape), dtype = action.dtype)
-            self.rewards = np.empty((self.capacity, *reward.shape), dtype = reward.type)
+            self.rewards = np.empty((self.capacity, *reward.shape), dtype = reward.dtype)
             self.next_observations = np.empty((self.capacity, *next_obs.shape), dtype = next_obs.dtype)
             self.dones = np.empty((self.capacity, *done.shape), dtype = done.dtype)
         

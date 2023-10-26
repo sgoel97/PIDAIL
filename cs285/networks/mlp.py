@@ -3,12 +3,9 @@ import torch.nn as nn
 
 
 class MLP(nn.Module):
-    def __init__(self, obs_dim, hidden_dims, action_dim, loss_fn, lr=0.001):
-        self.lr = lr
-        self.loss_fn = loss_fn
-
+    def __init__(self, obs_dim, hidden_dims, action_dim):
+        super().__init__()
         hidden_dims = [obs_dim] + hidden_dims + [action_dim]
-
         hidden_layers = []
         for i in range(len(hidden_dims) - 1):
             hidden_layers.append(
@@ -22,19 +19,8 @@ class MLP(nn.Module):
         )
 
     def forward(self, obs):
-        self.model.eval()
-        with torch.inference_mode():
-            q_values = self.model(obs)
-        return q_values
-
-    def update(self, obs, true_action):
-        self.model.train()
-
         q_values = self.model(obs)
-        loss = self.loss_fn(q_values, true_action)
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        return loss.item()
+        return q_values
+    
+    def save(self, model_path):
+        torch.save(self.model.state_dict(), f"{model_path}.pt")
