@@ -7,18 +7,19 @@ from tqdm import tqdm
 class State:
     similarity_weight = 0.5
 
-    def __init__(self, obs, action, next_obs, reward):
+    def __init__(self, obs, action, next_obs, reward, done):
         self.obs = obs
         self.action = action
         self.next_obs = next_obs
         self.reward = reward
+        self.done = done
 
     def compare(self, other):
         dot = np.dot(self.obs, other.obs)
         self_obs_norm = np.linalg.norm(self.obs)
         other_obs_norm = np.linalg.norm(other.obs)
         obs_similarity = dot / (self_obs_norm * other_obs_norm)
-        reward_similarity = self.reward - other.reward
+        reward_similarity = abs(self.reward - other.reward)
         return (
             State.similarity_weight * obs_similarity
             + (1 - State.similarity_weight) * reward_similarity
@@ -26,7 +27,7 @@ class State:
 
 
 class Trajectory:
-    similarity_threshold = 0.8  # TODO: currently arbitrary; I found this by looking at the similarity distribution in the Hopper expert data
+    similarity_threshold = 0.4999988  # TODO: currently arbitrary
 
     def __init__(self):
         self.states = []
@@ -75,6 +76,7 @@ def create_trajectories(expert_file_path):
                 demo["action"][b],
                 demo["next_observation"][b],
                 demo["reward"][b],
+                demo["terminal"][b]
             )
             trajectory.add_state(state)
         trajectories.append(trajectory)
@@ -122,13 +124,13 @@ def get_state_variance(state, agent, n_iters=100):
     """
     actions = []
     for _ in range(n_iters):
-        action = agent.get_action(state)
+        action = agent.get_action(state.obs)
         actions.append(action)
-    actions = torch.tensor(actions)
+    actions = torch.tensor(actions, dtype=torch.float32)
     return actions.var()
 
 
-def get_state_collection_variance(similar_states, agent, n_iters=100):
+def get_state_collection_variance(similar_states, trajectories, agent, n_iters=100):
     """
     Gets the average variance of actions taken by our agent from a list of
     given states that are similar to eachother
@@ -138,11 +140,13 @@ def get_state_collection_variance(similar_states, agent, n_iters=100):
         agent: provides action for each state
         n_iters: Number of actions to take from the state when determining the variance
     returns:
-        variance: average variance of the states
+        variances: variance across all states
     """
     total_variance = 0
-    for state in similar_states:
-        state_variance = get_state_variance(state, agent, n_iters)
+    variances = []
+    for traj_idx, state_idx in tqdm(similar_states):
+        state_variance = get_state_variance(trajectories[traj_idx].states[state_idx], agent, n_iters)
         total_variance += state_variance
+        variances.append((traj_idx, state_idx, state_variance))
     average_variance = total_variance / len(similar_states)
-    return average_variance
+    return variances
