@@ -30,6 +30,7 @@ def training_loop(env_name, using_demos):
     # Set up environment, hyperparameters, and data storage
     gym_env_name = get_env(env_name)
     env = gym.make(gym_env_name)
+    # TODO: action dim for the agent network really only works with discrete action spaces
     agent = Agent(env.observation_space.shape[0], env.action_space.n)
     replay_buffer = ReplayBuffer()
     total_steps = 1000
