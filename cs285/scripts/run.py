@@ -4,14 +4,15 @@ sys.path.append("/Users/tutrinh/Academic/CS285/285-project/cs285/")
 import os
 pwd = os.getcwd()
 if pwd.endswith("285-project"):
-    model_path = pwd + "/cs285/networks/"
+    model_path = pwd + "/cs285/data/"
 elif pwd.endswith("cs285"):
-    model_path = pwd + "/networks/"
+    model_path = pwd + "/data/"
 elif pwd.endswith("scripts"):
-    model_path = "../networks/"
+    model_path = "../data/"
 else:
     raise Exception("Execute run.py from inside either 285-project, cs285, or scripts")
 import argparse
+import time
 
 import gymnasium as gym
 from infrastructure.buffer import ReplayBuffer
@@ -55,17 +56,21 @@ def training_loop(env_name):
             q_values.append(0)
             target_values.append(0)
 
-    agent.q_net.save(model_path + f"{env_name}_q_net.pt")
-    agent.target_net.save(model_path + f"{env_name}_target_net.pt")
+    full_path = model_path + f"{env_name}/{int(time.time())}/"
+    if not os.path.exists(full_path):
+        os.makedirs(full_path)
+    agent.q_net.save(full_path + "q_net.pt")
+    agent.target_net.save(full_path + "target_net.pt")
     env.close()
-    return total_steps, losses, q_values, target_values
+    return total_steps, losses, q_values, target_values, full_path
 
 
-def plot_results(total_steps, losses, q_values, target_values):
+def plot_results(total_steps, losses, q_values, target_values, save_path):
     plt.plot(range(total_steps), losses, label = "Loss")
     plt.plot(range(total_steps), q_values, label = "Q-value")
     plt.plot(range(total_steps), target_values, label = "Target value")
     plt.legend()
+    plt.savefig(save_path + "results.png")
     plt.show()
 
 
@@ -74,5 +79,5 @@ if __name__ == "__main__":
     env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
     parser.add_argument("--env_name", "-e", required = True, choices = env_choices, help = f"Choices are {env_choices}")
     args = parser.parse_args()
-    total_steps, losses, q_values, target_values = training_loop(args.env_name)
-    plot_results(total_steps, losses, q_values, target_values)
+    total_steps, losses, q_values, target_values, full_path = training_loop(args.env_name)
+    plot_results(total_steps, losses, q_values, target_values, full_path)
