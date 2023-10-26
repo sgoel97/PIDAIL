@@ -1,5 +1,5 @@
 class Trajectory:
-    similarity_threshold = 0.8  # TODO: currently arbitrary; I found this by looking at the similarity distribution in the Hopper expert data
+    similarity_threshold = 0.4999988  # TODO: currently arbitrary
 
     def __init__(self):
         self.states = []

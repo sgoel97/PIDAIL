@@ -33,8 +33,15 @@ def get_env(env_name):
     return env_mapper[env_name]
 
 
-def save_networks(using_demos, env_name, agent):
-    extension = "with_demos" if using_demos else "from_scratch"
+def save_networks(using_demos, prune, env_name, agent):
+    if using_demos:
+        if prune:
+            extension = "pruned"
+        else:
+            extension = "with_demos"
+    else:
+        extension = "from_scratch"
+
     data_path = Path(f"cs285/data/{env_name}/{int(time.time())}_{extension}/")
     data_path.mkdir(parents=True, exist_ok=True)
 

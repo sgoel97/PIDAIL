@@ -4,6 +4,7 @@ import argparse
 
 import gymnasium as gym
 from tqdm import tqdm
+import numpy as np
 
 sys.path.append(os.getcwd() + "/cs285/")
 
@@ -14,7 +15,7 @@ from infrastructure.plotting_utils import *
 from agents.agent import Agent
 
 
-def training_loop(env_name, using_demos):
+def training_loop(env_name, using_demos, prune):
     # Set up environment, hyperparameters, and data storage
     gym_env_name = get_env(env_name)
     env = gym.make(gym_env_name)
@@ -32,20 +33,34 @@ def training_loop(env_name, using_demos):
     # load the expert data into the replay buffer
     if using_demos:
         expert_file_path = f"../experts/expert_data_{gym_env_name}.pkl"
-        with open(expert_file_path, "rb") as f:
-            demos = pickle.load(f)
-        for demo in demos:
-            replay_buffer.insert(
-                demo["observation"],
-                demo["action"],
-                demo["reward"],
-                demo["next_observation"],
-                demo["terminal"],
-            )
-        # TODO: handle the similarity shit here
+        # TODO: handle the similarity shit better here
         trajectories = create_trajectories(expert_file_path)
-        similar_states = get_similar_states(trajectories)
-        ...
+        if prune:
+            similar_states = get_similar_states(trajectories)
+            variances = get_state_collection_variance(
+                similar_states, trajectories, agent
+            )
+            threshold = np.percentile([var[2] for var in variances], 80)
+            for traj_idx, state_idx, variance in variances:
+                if variance < threshold:
+                    state = trajectories[traj_idx].states[state_idx]
+                    replay_buffer.insert(
+                        state.obs,
+                        state.action,
+                        state.reward,
+                        state.next_obs,
+                        state.done,
+                    )
+        else:
+            for trajectory in trajectories:
+                for state in trajectory.states:
+                    replay_buffer.insert(
+                        state.obs,
+                        state.action,
+                        state.reward,
+                        state.next_obs,
+                        state.done,
+                    )
 
     # Main training loop
     observation, _ = env.reset()
@@ -79,7 +94,8 @@ def training_loop(env_name, using_demos):
             target_values.append(0)
 
     # Save networks
-    data_path = save_networks(using_demos, env_name, agent)
+    data_path = save_networks(using_demos, prune, env_name, agent)
+
     env.close()
     return total_steps, losses, q_values, target_values, data_path
 
@@ -100,8 +116,14 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether the agent is using expert data to learn or learning on its own",
     )
+    parser.add_argument(
+        "--prune",
+        "-p",
+        action="store_true",
+        help="Whether or not to prune trajectories",
+    )
     args = parser.parse_args()
     total_steps, losses, q_values, target_values, data_path = training_loop(
-        args.env_name, args.demos
+        args.env_name, args.demos, args.prune
     )
     plot_results(total_steps, losses, q_values, target_values, data_path)
