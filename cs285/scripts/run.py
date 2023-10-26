@@ -77,7 +77,8 @@ def training_loop(env_name, using_demos):
             target_values.append(0)
 
     # Save networks
-    full_path = model_path + f"{env_name}/{int(time.time())}/"
+    extension = "with_demos" if using_demos else "from_scratch"
+    full_path = model_path + f"{env_name}/{int(time.time())}_{extension}/"
     if not os.path.exists(full_path):
         os.makedirs(full_path)
     agent.q_net.save(full_path + "q_net.pt")

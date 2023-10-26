@@ -23,4 +23,4 @@ class MLP(nn.Module):
         return q_values
     
     def save(self, model_path):
-        torch.save(self.model.state_dict(), f"{model_path}.pt")
+        torch.save(self.model.state_dict(), model_path)
