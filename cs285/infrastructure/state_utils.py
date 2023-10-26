@@ -12,31 +12,34 @@ class State:
         self.action = action
         self.next_obs = next_obs
         self.reward = reward
-    
+
     def compare(self, other):
         dot = np.dot(self.obs, other.obs)
         self_obs_norm = np.linalg.norm(self.obs)
         other_obs_norm = np.linalg.norm(other.obs)
         obs_similarity = dot / (self_obs_norm * other_obs_norm)
-        reward_similarity = (self.reward - other.reward)
-        return State.similarity_weight * obs_similarity + (1 - State.similarity_weight) * reward_similarity
-    
+        reward_similarity = self.reward - other.reward
+        return (
+            State.similarity_weight * obs_similarity
+            + (1 - State.similarity_weight) * reward_similarity
+        )
+
 
 class Trajectory:
     similarity_threshold = 0.8  # TODO: currently arbitrary; I found this by looking at the similarity distribution in the Hopper expert data
 
     def __init__(self):
         self.states = []
-    
+
     def __len__(self):
         return len(self.states)
-    
+
     def add_state(self, state):
         self.states.append(state)
-    
+
     def get_state(self, idx):
         return self.states[idx]
-    
+
     def compare(self, other):
         n = len(self)
         m = len(other)
@@ -67,7 +70,12 @@ def create_trajectories(expert_file_path):
     for demo in demos:
         trajectory = Trajectory()
         for b in range(batch_size):
-            state = State(demo["observation"][b], demo["action"][b], demo["next_observation"][b], demo["reward"][b])
+            state = State(
+                demo["observation"][b],
+                demo["action"][b],
+                demo["next_observation"][b],
+                demo["reward"][b],
+            )
             trajectory.add_state(state)
         trajectories.append(trajectory)
     return trajectories

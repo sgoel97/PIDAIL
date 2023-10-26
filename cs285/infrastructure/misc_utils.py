@@ -10,10 +10,12 @@ def from_numpy(data):
         data = data.float()
     return data.to(DEVICE)
 
+
 def to_numpy(tensor):
     if isinstance(tensor, dict):
         return {k: to_numpy(v) for k, v in tensor.items()}
     return tensor.to("cpu").detach().numpy()
+
 
 def get_env(env_name):
     env_mapper = {
@@ -22,6 +24,6 @@ def get_env(env_name):
         "pendulum": "Pendulum-v1",
         "inv_pend": "InvertedPendulum-v4",
         "lander": "LunarLander-v2",
-        "hopper": "Hopper-v4"
+        "hopper": "Hopper-v4",
     }
     return env_mapper[env_name]

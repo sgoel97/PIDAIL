@@ -20,7 +20,7 @@ class Agent(nn.Module):
         self.target_net = MLP(obs_shape, [self.hidden_dim] * 2, num_actions).to(DEVICE)
         self.q_optimizer = optim.AdamW(self.q_net.parameters())
         self.q_loss_fn = nn.MSELoss()
-        self.lr_schedule = optim.lr_scheduler.ConstantLR(self.q_optimizer, factor = 1.0)
+        self.lr_schedule = optim.lr_scheduler.ConstantLR(self.q_optimizer, factor=1.0)
 
         self.obs_shape = obs_shape
         self.num_actions = num_actions
@@ -28,11 +28,12 @@ class Agent(nn.Module):
 
         self.update_target_net()
 
-    
     def get_action(self, obs):
         obs = from_numpy(obs)
         prob = np.random.random()
-        epsilon = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * np.exp(-1.0 * self.total_steps / self.epsilon_decay)
+        epsilon = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * np.exp(
+            -1.0 * self.total_steps / self.epsilon_decay
+        )
         self.total_steps += 1
         if prob > epsilon:
             with torch.no_grad():
@@ -41,13 +42,14 @@ class Agent(nn.Module):
         else:
             action = torch.tensor([np.random.choice(range(self.num_actions))])
         return to_numpy(action).squeeze(0).item()
-    
 
     def update_q_net(self, obs, action, reward, next_obs, done):
         with torch.no_grad():
-            target_q_value = torch.max(self.target_net(next_obs), dim = 1)[0]
-            target_value = reward + self.discount * (1 - done.to(torch.float)) * target_q_value
-        
+            target_q_value = torch.max(self.target_net(next_obs), dim=1)[0]
+            target_value = (
+                reward + self.discount * (1 - done.to(torch.float)) * target_q_value
+            )
+
         q_value = torch.gather(self.q_net(obs), 1, action.unsqueeze(1)).squeeze(1)
         loss = self.q_loss_fn(q_value, target_value)
         self.q_optimizer.zero_grad()
@@ -58,13 +60,11 @@ class Agent(nn.Module):
         return {
             "q_net_loss": loss.item(),
             "q_value": q_value.mean().item(),
-            "target_value": target_value.mean().item()
+            "target_value": target_value.mean().item(),
         }
-    
 
     def update_target_net(self):
         self.target_net.load_state_dict(self.q_net.state_dict())
-    
 
     def update(self, obs, action, reward, next_obs, done):
         q_net_update_info = self.update_q_net(obs, action, reward, next_obs, done)
