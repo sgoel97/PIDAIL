@@ -21,6 +21,6 @@ class MLP(nn.Module):
     def forward(self, obs):
         q_values = self.model(obs)
         return q_values
-    
+
     def save(self, model_path):
         torch.save(self.model.state_dict(), model_path)

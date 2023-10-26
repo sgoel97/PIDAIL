@@ -1,31 +1,17 @@
-import sys
-
-# TODO: hacky asf but just append your path to cs285/ here and imports should work
-sys.path.append("/Users/tutrinh/Academic/CS285/285-project/cs285/")
 import os
-
-pwd = os.getcwd()
-if pwd.endswith("285-project"):
-    model_path = pwd + "/cs285/data/"
-    expert_path = pwd + "/cs285/experts/"
-elif pwd.endswith("cs285"):
-    model_path = pwd + "/data/"
-    expert_path = pwd + "/experts/"
-elif pwd.endswith("scripts"):
-    model_path = "../data/"
-    expert_path = "../experts/"
-else:
-    raise Exception("Execute run.py from inside either 285-project, cs285, or scripts")
+import sys
 import argparse
-import time
 
 import gymnasium as gym
+from tqdm import tqdm
+
+sys.path.append(os.getcwd() + "/cs285/")
+
 from infrastructure.buffer import ReplayBuffer
 from infrastructure.misc_utils import *
 from infrastructure.state_utils import *
+from infrastructure.plotting_utils import *
 from agents.agent import Agent
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 
 
 def training_loop(env_name, using_demos):
@@ -45,7 +31,7 @@ def training_loop(env_name, using_demos):
     # If agent is using expert demos to learn instead of learning from scratch,
     # load the expert data into the replay buffer
     if using_demos:
-        expert_file_path = f"{expert_path}expert_data_{gym_env_name}.pkl"
+        expert_file_path = f"../experts/expert_data_{gym_env_name}.pkl"
         with open(expert_file_path, "rb") as f:
             demos = pickle.load(f)
         for demo in demos:
@@ -93,26 +79,9 @@ def training_loop(env_name, using_demos):
             target_values.append(0)
 
     # Save networks
-    extension = "with_demos" if using_demos else "from_scratch"
-    full_path = model_path + f"{env_name}/{int(time.time())}_{extension}/"
-    if not os.path.exists(full_path):
-        os.makedirs(full_path)
-    agent.q_net.save(full_path + "q_net.pt")
-    agent.target_net.save(full_path + "target_net.pt")
+    data_path = save_networks(using_demos, env_name, agent)
     env.close()
-    return total_steps, losses, q_values, target_values, full_path
-
-
-def plot_results(total_steps, losses, q_values, target_values, save_path):
-    """
-    Plots loss, Q-value, and target value, and saves
-    """
-    plt.plot(range(total_steps), losses, label="Loss")
-    plt.plot(range(total_steps), q_values, label="Q-value")
-    plt.plot(range(total_steps), target_values, label="Target value")
-    plt.legend()
-    plt.savefig(save_path + "results.png")
-    plt.show()
+    return total_steps, losses, q_values, target_values, data_path
 
 
 if __name__ == "__main__":
@@ -132,7 +101,7 @@ if __name__ == "__main__":
         help="Whether the agent is using expert data to learn or learning on its own",
     )
     args = parser.parse_args()
-    total_steps, losses, q_values, target_values, full_path = training_loop(
+    total_steps, losses, q_values, target_values, data_path = training_loop(
         args.env_name, args.demos
     )
-    plot_results(total_steps, losses, q_values, target_values, full_path)
+    plot_results(total_steps, losses, q_values, target_values, data_path)

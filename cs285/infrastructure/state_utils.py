@@ -1,57 +1,8 @@
 import torch
 import pickle
-import numpy as np
-from tqdm import tqdm
 
-
-class State:
-    similarity_weight = 0.5
-
-    def __init__(self, obs, action, next_obs, reward):
-        self.obs = obs
-        self.action = action
-        self.next_obs = next_obs
-        self.reward = reward
-
-    def compare(self, other):
-        dot = np.dot(self.obs, other.obs)
-        self_obs_norm = np.linalg.norm(self.obs)
-        other_obs_norm = np.linalg.norm(other.obs)
-        obs_similarity = dot / (self_obs_norm * other_obs_norm)
-        reward_similarity = self.reward - other.reward
-        return (
-            State.similarity_weight * obs_similarity
-            + (1 - State.similarity_weight) * reward_similarity
-        )
-
-
-class Trajectory:
-    similarity_threshold = 0.8  # TODO: currently arbitrary; I found this by looking at the similarity distribution in the Hopper expert data
-
-    def __init__(self):
-        self.states = []
-
-    def __len__(self):
-        return len(self.states)
-
-    def add_state(self, state):
-        self.states.append(state)
-
-    def get_state(self, idx):
-        return self.states[idx]
-
-    def compare(self, other):
-        n = len(self)
-        m = len(other)
-        self_states = []
-        other_states = []
-        for i in tqdm(range(n)):
-            for j in range(m):
-                similarity = self.get_state(i).compare(other.get_state(j))
-                if similarity > Trajectory.similarity_threshold:
-                    self_states.append(i)
-                    other_states.append(j)
-        return self_states, other_states
+from State import State
+from Trajectory import Trajectory
 
 
 def create_trajectories(expert_file_path):

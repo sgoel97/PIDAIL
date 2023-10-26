@@ -1,4 +1,8 @@
+import time
+from pathlib import Path
+
 import torch
+
 from constants import *
 
 
@@ -27,3 +31,14 @@ def get_env(env_name):
         "hopper": "Hopper-v4",
     }
     return env_mapper[env_name]
+
+
+def save_networks(using_demos, env_name, agent):
+    extension = "with_demos" if using_demos else "from_scratch"
+    data_path = Path(f"cs285/data/{env_name}/{int(time.time())}_{extension}/")
+    data_path.mkdir(parents=True, exist_ok=True)
+
+    agent.q_net.save(data_path / "q_net.pt")
+    agent.target_net.save(data_path / "target_net.pt")
+
+    return data_path
