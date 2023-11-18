@@ -1,7 +1,9 @@
+import numpy as np
 import torch
 import pickle
+from sklearn.cluster import AgglomerativeClustering
 
-from infrastructure.State import State
+from infrastructure.Transition import Transition
 from infrastructure.Trajectory import Trajectory
 
 
@@ -17,37 +19,68 @@ def create_trajectories(expert_file_path):
     with open(expert_file_path, "rb") as f:
         demos = pickle.load(f)
     trajectories = []
-    batch_size = demos[0]["observation"].shape[0]
+    num_transitions = demos[0]["observation"].shape[0]
     for demo in demos:
         trajectory = Trajectory()
-        for b in range(batch_size):
-            state = State(
-                demo["observation"][b],
-                demo["action"][b],
-                demo["next_observation"][b],
-                demo["reward"][b],
-                demo["terminal"][b],
+        for i in range(num_transitions):
+            transition = Transition(
+                demo["observation"][i],
+                demo["action"][i],
+                demo["next_observation"][i],
+                demo["reward"][i],
+                demo["terminal"][i],
             )
-            trajectory.add_state(state)
+            trajectory.add_transition(transition)
         trajectories.append(trajectory)
     return trajectories
 
 
-def get_similar_states(trajectories):
+def get_similar_transitions(
+    trajectories, similarity_threshold=0.2, group_size_treshold=10
+):
     """
     params:
         trajectories: List of trajectories with states we want to aggregate
     returns:
-        similar_states: list of (list of states) that are similar to each other.
+        list of (list of transitions) that are similar to each other.
     """
-    num_traj = len(trajectories)
-    similar_states = []
-    for i in range(num_traj):
-        for j in range(i + 1, num_traj):
-            i_states, j_states = trajectories[i].compare(trajectories[j])
-            for k in range(len(i_states)):
-                similar_states.extend([(i, i_states[k]), (j, j_states[k])])
-    return similar_states
+    all_transitions = np.array(
+        [trajectory.transitions for trajectory in trajectories]
+    ).flatten()
+    all_obs = np.array([transition.obs for transition in all_transitions])
+
+    clustering_model = AgglomerativeClustering(
+        n_clusters=None,
+        metric="l2",
+        linkage="average",
+        distance_threshold=similarity_threshold,
+    )
+
+    # print("Fitting clustering model...")
+    clustering_model.fit(all_obs)
+    cluster_labels = clustering_model.labels_
+
+    all_transitions = np.vstack([all_transitions, cluster_labels]).T
+    all_transitions = all_transitions[all_transitions[:, 1].argsort()]
+    grouped_transitions = np.split(
+        all_transitions[:, 0],
+        np.unique(all_transitions[:, 1], return_index=True)[1][1:],
+    )
+
+    grouped_transitions_filtered = np.array(
+        [group for group in grouped_transitions if len(group) > group_size_treshold]
+    )
+
+    return grouped_transitions_filtered
+
+    # num_traj = len(trajectories)
+    # similar_states = []
+    # for i in range(num_traj):
+    #     for j in range(i + 1, num_traj):
+    #         i_states, j_states = trajectories[i].compare(trajectories[j])
+    #         for k in range(len(i_states)):
+    #             similar_states.extend([(i, i_states[k]), (j, j_states[k])])
+    # return similar_states
 
 
 def get_state_variance(state, agent, n_iters=100):

@@ -2,16 +2,16 @@ class Trajectory:
     similarity_threshold = 0.4999988  # TODO: currently arbitrary
 
     def __init__(self):
-        self.states = []
+        self.transitions = []
 
     def __len__(self):
-        return len(self.states)
+        return len(self.transitions)
 
-    def add_state(self, state):
-        self.states.append(state)
+    def add_transition(self, state):
+        self.transitions.append(state)
 
-    def get_state(self, idx):
-        return self.states[idx]
+    def get_transition(self, idx):
+        return self.transitions[idx]
 
     def compare(self, other):
         n = len(self)
@@ -20,7 +20,7 @@ class Trajectory:
         other_states = []
         for i in range(n):
             for j in range(m):
-                similarity = self.get_state(i).compare(other.get_state(j))
+                similarity = self.get_transition(i).compare(other.get_transition(j))
                 if similarity > Trajectory.similarity_threshold:
                     self_states.append(i)
                     other_states.append(j)

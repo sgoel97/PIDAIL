@@ -36,7 +36,7 @@ def training_loop(env_name, using_demos, prune):
         # TODO: handle the similarity shit better here
         trajectories = create_trajectories(expert_file_path)
         if prune:
-            similar_states = get_similar_states(trajectories)
+            similar_states = get_similar_transitions(trajectories)
             variances = get_state_collection_variance(
                 similar_states, trajectories, agent
             )

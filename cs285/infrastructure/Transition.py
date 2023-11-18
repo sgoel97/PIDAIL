@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class State:
+class Transition:
     similarity_weight = 0.5
 
     def __init__(self, obs, action, next_obs, reward, done):
@@ -18,6 +18,6 @@ class State:
         obs_similarity = dot / (self_obs_norm * other_obs_norm)
         reward_similarity = abs(self.reward - other.reward)
         return (
-            State.similarity_weight * obs_similarity
-            + (1 - State.similarity_weight) * reward_similarity
+            Transition.similarity_weight * obs_similarity
+            + (1 - Transition.similarity_weight) * reward_similarity
         )
