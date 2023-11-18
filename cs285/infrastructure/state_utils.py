@@ -1,8 +1,8 @@
 import torch
 import pickle
 
-from State import State
-from Trajectory import Trajectory
+from infrastructure.State import State
+from infrastructure.Trajectory import Trajectory
 
 
 def create_trajectories(expert_file_path):
@@ -33,23 +33,12 @@ def create_trajectories(expert_file_path):
     return trajectories
 
 
-# FIXME: don't think this function is necessary now
-def get_action(state, next_state):
-    """
-    TODO: Need to define what a state is lmao
-
-    ideally its just (obs, action, next_obs, reward, done) but idk how trajectories are currently defined
-    """
-    return 0
-
-
 def get_similar_states(trajectories):
     """
     params:
-        trajectories: initial expert trajectories to aggregate
+        trajectories: List of trajectories with states we want to aggregate
     returns:
-        similar_states: list of states that are similar to each other. This is a list of
-        tuples where the first element is the index of the trajectory and the second element is the index of the observation.
+        similar_states: list of (list of states) that are similar to each other.
     """
     num_traj = len(trajectories)
     similar_states = []

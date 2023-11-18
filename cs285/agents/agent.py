@@ -1,6 +1,7 @@
+import numpy as np
 import torch
 from torch import nn, optim
-import numpy as np
+
 from networks.mlp import MLP
 from infrastructure.misc_utils import *
 from constants import *

@@ -32,7 +32,7 @@ def training_loop(env_name, using_demos, prune):
     # If agent is using expert demos to learn instead of learning from scratch,
     # load the expert data into the replay buffer
     if using_demos:
-        expert_file_path = f"../experts/expert_data_{gym_env_name}.pkl"
+        expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
         # TODO: handle the similarity shit better here
         trajectories = create_trajectories(expert_file_path)
         if prune:

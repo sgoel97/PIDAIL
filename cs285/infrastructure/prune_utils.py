@@ -1,5 +1,8 @@
-import torch
-from state_utils import get_similar_states, get_state_collection_variance, get_action
+from infrastructure.state_utils import (
+    get_similar_states,
+    get_state_collection_variance,
+    get_action,
+)
 
 
 def get_best_action(state_collection, agent):
