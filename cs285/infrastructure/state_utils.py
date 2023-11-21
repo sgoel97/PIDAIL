@@ -1,6 +1,8 @@
-import numpy as np
-import torch
 import pickle
+import numpy as np
+import pandas as pd
+import torch
+from torch.distributions import Categorical
 from sklearn.cluster import AgglomerativeClustering
 
 from infrastructure.Transition import Transition
@@ -82,21 +84,55 @@ def get_transition_group_variance(transition_group):
     return np.var(actions)
 
 
+def get_transition_group_entropy(transition_group):
+    """
+    Gets the average variance of actions taken by expert from a given group of
+    observations characterized by a transition group
+
+    params:
+        transition_group: A group of transitions with similar observations
+    returns:
+        variance of the actions taken
+    """
+    actions = np.array([transition.action for transition in transition_group])
+    counts = pd.Series(actions).value_counts().to_numpy()
+    probs = torch.tensor(counts / len(actions))
+    entropy = Categorical(probs=probs).entropy()
+
+    return entropy.item()
+
+
+def get_group_measures(transition_groups, method="variance"):
+    if method == "variance":
+        measures = [
+            get_transition_group_variance(transition_group)
+            for transition_group in transition_groups
+        ]
+
+    else:
+        measures = [
+            get_transition_group_entropy(transition_group)
+            for transition_group in transition_groups
+        ]
+
+    return measures
+
+
 def filter_transition_groups(
-    transition_groups, group_size_treshold=10, variance_cutoff=80
+    transition_groups, size_treshold=10, measure_cutoff=80, method="variance"
 ):
-    variances = [
-        get_transition_group_variance(transition_group)
-        for transition_group in transition_groups
+    assert method in ["variance", "entropy"]
+    measures = get_group_measures(transition_groups, method="variance")
+    measure_threshold = np.percentile(measures, measure_cutoff)
+    measure_mask = np.array(measures) < measure_threshold
+
+    group_sizes = np.array(list(map(len, transition_groups)))
+    group_size_mask = group_sizes < size_treshold
+
+    valid_transition_groups = [
+        transition_groups[i]
+        for i in range(len(transition_groups))
+        if (measure_mask[i] or group_size_mask[i])
     ]
-
-    variance_threshold = np.percentile(variances, variance_cutoff)
-
-    valid_transition_groups = []
-    for i in range(len(transition_groups)):
-        group = transition_groups[i]
-        group_variance = variances[i]
-        if group_variance < variance_threshold or len(group) < group_size_treshold:
-            valid_transition_groups.append(group)
 
     return valid_transition_groups

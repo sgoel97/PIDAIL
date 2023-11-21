@@ -20,7 +20,13 @@ def training_loop(env_name, using_demos, prune):
     gym_env_name = get_env(env_name)
     env = gym.make(gym_env_name)
     # TODO: action dim for the agent network really only works with discrete action spaces
-    agent = Agent(env.observation_space.shape[0], env.action_space.n)
+    discrete = isinstance(env.action_space, gym.spaces.Discrete)
+
+    if discrete:
+        agent = Agent(env.observation_space.shape[0], env.action_space.n)
+    else:
+        agent = Agent(env.observation_space.shape[0], env.action_space.shape[0])
+
     replay_buffer = ReplayBuffer()
     total_steps = 1000
     non_learning_steps = 50
@@ -43,7 +49,7 @@ def training_loop(env_name, using_demos, prune):
             print(f"Average group size: {avg_group_size}")
 
             filtered_transition_groups = filter_transition_groups(
-                transition_groups, group_size_treshold=8, variance_cutoff=60
+                transition_groups, size_treshold=8, measure_cutoff=80
             )
             avg_group_size = np.mean(list(map(len, filtered_transition_groups)))
             print(f"Number of filtered groups: {len(filtered_transition_groups)}")
