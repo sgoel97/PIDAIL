@@ -33,34 +33,43 @@ def training_loop(env_name, using_demos, prune):
     # load the expert data into the replay buffer
     if using_demos:
         expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
-        # TODO: handle the similarity shit better here
+
         trajectories = create_trajectories(expert_file_path)
+
         if prune:
-            similar_states = get_similar_transitions(trajectories)
-            variances = get_state_collection_variance(
-                similar_states, trajectories, agent
+            transition_groups = get_similar_transitions(trajectories)
+            avg_group_size = np.mean(list(map(len, transition_groups)))
+            print(f"Number of transition groups: {len(transition_groups)}")
+            print(f"Average group size: {avg_group_size}")
+
+            filtered_transition_groups = filter_transition_groups(
+                transition_groups, group_size_treshold=8, variance_cutoff=60
             )
-            threshold = np.percentile([var[2] for var in variances], 80)
-            for traj_idx, state_idx, variance in variances:
-                if variance < threshold:
-                    state = trajectories[traj_idx].states[state_idx]
+            avg_group_size = np.mean(list(map(len, filtered_transition_groups)))
+            print(f"Number of filtered groups: {len(filtered_transition_groups)}")
+            print(f"Average filtered group size: {avg_group_size}")
+
+            for group in filtered_transition_groups:
+                for transition in group:
                     replay_buffer.insert(
-                        state.obs,
-                        state.action,
-                        state.reward,
-                        state.next_obs,
-                        state.done,
+                        transition.obs,
+                        transition.action,
+                        transition.reward,
+                        transition.next_obs,
+                        transition.done,
                     )
         else:
             for trajectory in trajectories:
-                for state in trajectory.states:
+                for transition in trajectory.transitions:
                     replay_buffer.insert(
-                        state.obs,
-                        state.action,
-                        state.reward,
-                        state.next_obs,
-                        state.done,
+                        transition.obs,
+                        transition.action,
+                        transition.reward,
+                        transition.next_obs,
+                        transition.done,
                     )
+
+        print(f"Replay buffer size: {len(replay_buffer)}")
 
     # Main training loop
     observation, _ = env.reset()

@@ -35,9 +35,7 @@ def create_trajectories(expert_file_path):
     return trajectories
 
 
-def get_similar_transitions(
-    trajectories, similarity_threshold=0.2, group_size_treshold=10
-):
+def get_similar_transitions(trajectories, similarity_threshold=0.2):
     """
     params:
         trajectories: List of trajectories with states we want to aggregate
@@ -67,60 +65,38 @@ def get_similar_transitions(
         np.unique(all_transitions[:, 1], return_index=True)[1][1:],
     )
 
-    grouped_transitions_filtered = np.array(
-        [group for group in grouped_transitions if len(group) > group_size_treshold]
-    )
-
-    return grouped_transitions_filtered
-
-    # num_traj = len(trajectories)
-    # similar_states = []
-    # for i in range(num_traj):
-    #     for j in range(i + 1, num_traj):
-    #         i_states, j_states = trajectories[i].compare(trajectories[j])
-    #         for k in range(len(i_states)):
-    #             similar_states.extend([(i, i_states[k]), (j, j_states[k])])
-    # return similar_states
+    return grouped_transitions
 
 
-def get_state_variance(state, agent, n_iters=100):
+def get_transition_group_variance(transition_group):
     """
-    Gets the variance of actions taken by our agent from a given state
+    Gets the average variance of actions taken by expert from a given group of
+    observations characterized by a transition group
 
     params:
-        state: observation of the environment
-        agent: provides action for each state
-        n_iters: Number of actions to take from the state when determining the variance
+        transition_group: A group of transitions with similar observations
     returns:
-        variance: average variance of the states
+        variance of the actions taken
     """
-    actions = []
-    for _ in range(n_iters):
-        action = agent.get_action(state.obs)
-        actions.append(action)
-    actions = torch.tensor(actions, dtype=torch.float32)
-    return actions.var()
+    actions = np.array([transition.action for transition in transition_group])
+    return np.var(actions)
 
 
-def get_state_collection_variance(similar_states, trajectories, agent, n_iters=100):
-    """
-    Gets the average variance of actions taken by our agent from a list of
-    given states that are similar to eachother
+def filter_transition_groups(
+    transition_groups, group_size_treshold=10, variance_cutoff=80
+):
+    variances = [
+        get_transition_group_variance(transition_group)
+        for transition_group in transition_groups
+    ]
 
-    params:
-        similar_states: List of states that are similar to each other
-        agent: provides action for each state
-        n_iters: Number of actions to take from the state when determining the variance
-    returns:
-        variances: variance across all states
-    """
-    total_variance = 0
-    variances = []
-    for traj_idx, state_idx in similar_states:
-        state_variance = get_state_variance(
-            trajectories[traj_idx].states[state_idx], agent, n_iters
-        )
-        total_variance += state_variance
-        variances.append((traj_idx, state_idx, state_variance))
-    average_variance = total_variance / len(similar_states)
-    return variances
+    variance_threshold = np.percentile(variances, variance_cutoff)
+
+    valid_transition_groups = []
+    for i in range(len(transition_groups)):
+        group = transition_groups[i]
+        group_variance = variances[i]
+        if group_variance < variance_threshold or len(group) < group_size_treshold:
+            valid_transition_groups.append(group)
+
+    return valid_transition_groups
