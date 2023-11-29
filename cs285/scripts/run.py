@@ -36,6 +36,9 @@ def training_loop(env_name, using_demos, prune):
     q_values = []
     target_values = []
 
+    if not discrete:
+        actor_losses = []
+
     # If agent is using expert demos to learn instead of learning from scratch,
     # load the expert data into the replay buffer
     if using_demos:
@@ -104,16 +107,27 @@ def training_loop(env_name, using_demos, prune):
             losses.append(update_info["q_net_loss"])
             q_values.append(update_info["q_value"])
             target_values.append(update_info["target_value"])
+
+            if not discrete:
+                actor_losses.append(update_info["actor_loss"])
         else:
             losses.append(0)
             q_values.append(0)
             target_values.append(0)
 
+            if not discrete:
+                actor_losses.append(0)
+
     # Save networks
     data_path = save_networks(using_demos, prune, env_name, agent)
 
     env.close()
-    return total_steps, losses, q_values, target_values, data_path
+
+    results = {"loss": losses, "q_values": q_values, "target_values": target_values}
+    if not discrete:
+        results["actor_loss"] = actor_losses
+
+    return total_steps, results, data_path
 
 
 if __name__ == "__main__":
@@ -139,7 +153,7 @@ if __name__ == "__main__":
         help="Whether or not to prune trajectories",
     )
     args = parser.parse_args()
-    total_steps, losses, q_values, target_values, data_path = training_loop(
+    total_steps, results, data_path = training_loop(
         args.env_name, args.demos, args.prune
     )
-    plot_results(total_steps, losses, q_values, target_values, data_path)
+    plot_results(total_steps, results.values(), results.keys(), data_path)

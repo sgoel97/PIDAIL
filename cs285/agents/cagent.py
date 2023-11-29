@@ -14,15 +14,14 @@ from constants import *
 class CAgent(nn.Module):
     def __init__(self, observation_shape: Sequence[int], action_dim: int):
         super().__init__()
-        self.target_critic_backup_type = "mean"
-        self.discount = 0.99
+        self.target_critic_backup_type = "doubleq"
+        self.discount = 0.98
         self.target_update_period = 1000
         self.soft_target_update_rate = None
         self.actor_gradient_type = "reparametrize"
-        self.num_actor_samples = 1
+        self.num_actor_samples = 5
         self.num_critic_updates = 1
-        self.num_critic_networks = 1
-        self.target_critic_backup_type = "mean"
+        self.num_critic_networks = 2
         self.use_entropy_bonus = True
 
         self.start_epsilon = 0.9
@@ -36,7 +35,7 @@ class CAgent(nn.Module):
         self.obs_shape = np.prod(observation_shape) # in case it's not 1 dimensional
         self.action_dim = action_dim
 
-        self.backup_entropy = False
+        self.backup_entropy = True
 
 
         assert self.target_critic_backup_type in [
