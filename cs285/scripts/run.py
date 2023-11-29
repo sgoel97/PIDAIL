@@ -152,7 +152,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether or not to prune trajectories",
     )
+
     args = parser.parse_args()
+
+    if not args.demos and args.prune:
+        raise NotImplementedError("Can't use prune without expert demos")
+
     total_steps, results, data_path = training_loop(
         args.env_name, args.demos, args.prune
     )

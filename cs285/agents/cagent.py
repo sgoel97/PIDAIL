@@ -15,17 +15,17 @@ class CAgent(nn.Module):
     def __init__(self, observation_shape: Sequence[int], action_dim: int):
         super().__init__()
         self.target_critic_backup_type = "doubleq"
-        self.discount = 0.98
+        self.discount = 0.99
         self.target_update_period = 1000
         self.soft_target_update_rate = None
         self.actor_gradient_type = "reparametrize"
-        self.num_actor_samples = 5
+        self.num_actor_samples = 1
         self.num_critic_updates = 1
         self.num_critic_networks = 2
-        self.use_entropy_bonus = True
+        self.use_entropy_bonus = False
 
-        self.start_epsilon = 0.9
-        self.end_epsilon = 0.05
+        self.start_epsilon = 0.09
+        self.end_epsilon = 0.005
         self.epsilon_decay = 1000
 
         self.loss_fn = nn.MSELoss()
@@ -111,9 +111,7 @@ class CAgent(nn.Module):
         """
         Compute the (ensembled) target Q-values for the given state-action pair.
         """
-        return torch.stack(
-            [critic(obs, action) for critic in self.target_critics], dim=0
-        )
+        return torch.stack([critic(obs, action) for critic in self.target_critics], dim=0)
 
     def q_backup_strategy(self, next_qs: torch.Tensor) -> torch.Tensor:
         """
@@ -138,17 +136,6 @@ class CAgent(nn.Module):
         num_critic_networks, batch_size = next_qs.shape
         assert num_critic_networks == self.num_critic_networks
 
-        # TODO(student): Implement the different backup strategies.
-        """
-        if self.target_critic_backup_type == "doubleq":
-            raise NotImplementedError
-        elif self.target_critic_backup_type == "min":
-            raise NotImplementedError
-        else:
-            # Default, we don't need to do anything.
-            pass
-
-        """
         if self.target_critic_backup_type == "doubleq":
             # Dual Q-update trick
             # Swap target_Q1 and target_Q2
@@ -165,6 +152,7 @@ class CAgent(nn.Module):
             next_qs = torch.mean(next_qs, dim=0)
         elif self.target_critic_backup_type == "redq":
             # Subsample update
+            raise NotImplementedError
             num_min_qs = 2
             subsampled_next_qs = torch.gather(
                 next_qs,
