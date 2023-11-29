@@ -6,7 +6,43 @@ import torch
 from torch import distributions
 
 from infrastructure.misc_utils import *
-from infrastructure.distributions import make_tanh_transformed, make_multi_normal # TODO fix
+from infrastructure.distributions import make_tanh_transformed, make_multi_normal
+
+def build_mlp(
+    input_size: int,
+    output_size: int,
+    n_layers: int,
+    size: int,
+):
+    """
+    Builds a feedforward neural network
+
+    arguments:
+        input_placeholder: placeholder variable for the state (batch_size, input_size)
+        scope: variable scope of the network
+
+        n_layers: number of hidden layers
+        size: dimension of each hidden layer
+        activation: activation of each hidden layer
+
+        input_size: size of the input layer
+        output_size: size of the output layer
+        output_activation: activation of the output layer
+
+    returns:
+        output_placeholder: the result of a forward pass through the hidden layers + the output layer
+    """
+    
+    layers = []
+    in_size = input_size
+    for _ in range(n_layers):
+        layers.append(nn.Linear(in_size, size))
+        layers.append(nn.ReLU())
+        in_size = size
+    layers.append(nn.Linear(in_size, output_size))
+
+    mlp = nn.Sequential(*layers)
+    return mlp
 
 class MLP2(nn.Module):
     """
@@ -34,28 +70,28 @@ class MLP2(nn.Module):
         self.fixed_std = fixed_std
 
         if discrete:
-            self.logits_net = ptu.build_mlp(
+            self.logits_net = build_mlp(
                 input_size=ob_dim,
                 output_size=ac_dim,
                 n_layers=n_layers,
                 size=layer_size,
-            ).to(ptu.device)
+            )
         else:
             if self.state_dependent_std:
                 assert fixed_std is None
-                self.net = ptu.build_mlp(
+                self.net = build_mlp(
                     input_size=ob_dim,
                     output_size=2*ac_dim,
                     n_layers=n_layers,
                     size=layer_size,
-                ).to(ptu.device)
+                )
             else:
-                self.net = ptu.build_mlp(
+                self.net = build_mlp(
                     input_size=ob_dim,
                     output_size=ac_dim,
                     n_layers=n_layers,
                     size=layer_size,
-                ).to(ptu.device)
+                )
 
                 if self.fixed_std:
                     self.std = 0.1
@@ -63,7 +99,6 @@ class MLP2(nn.Module):
                     self.std = nn.Parameter(
                         torch.full((ac_dim,), 0.0, dtype=torch.float32, device=ptu.device)
                     )
-
 
     def forward(self, obs: torch.FloatTensor) -> distributions.Distribution:
         """
@@ -91,3 +126,22 @@ class MLP2(nn.Module):
                 return make_multi_normal(mean, std)
 
         return action_distribution
+
+    def save(self, model_path):
+        torch.save(self.net.state_dict(), model_path)
+
+class StateActionCritic(nn.Module):
+    def __init__(self, ob_dim, ac_dim, n_layers, size):
+        super().__init__()
+        self.net = build_mlp(
+            input_size=ob_dim + ac_dim,
+            output_size=1,
+            n_layers=n_layers,
+            size=size,
+        )
+    
+    def forward(self, obs, acs):
+        return self.net(torch.cat([obs, acs], dim=-1)).squeeze(-1)
+
+    def save(self, model_path):
+        torch.save(self.net.state_dict(), model_path)

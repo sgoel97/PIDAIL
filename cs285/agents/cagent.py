@@ -2,7 +2,7 @@ from typing import Callable, Optional, Sequence, Tuple
 import copy
 
 import torch
-from torch import nn
+from torch import nn, optim
 import numpy as np
 
 from networks.mlp import *
@@ -11,12 +11,13 @@ from infrastructure.misc_utils import *
 from constants import *
 
 
-class cagent(nn.Module):
+class CAgent(nn.Module):
     def __init__(self, observation_shape: Sequence[int], action_dim: int):
         super().__init__()
         self.target_critic_backup_type = "mean"
         self.discount = 0.99
         self.target_update_period = 1000
+        self.soft_target_update_rate = None
         self.actor_gradient_type = "reparametrize"
         self.num_actor_samples = 1
         self.num_critic_updates = 1
@@ -26,7 +27,7 @@ class cagent(nn.Module):
 
         self.start_epsilon = 0.9
         self.end_epsilon = 0.05
-        self.epislon_decay = 1000
+        self.epsilon_decay = 1000
 
         self.loss_fn = nn.MSELoss()
         self.total_steps = 0
@@ -35,31 +36,33 @@ class cagent(nn.Module):
         self.obs_shape = np.prod(observation_shape) # in case it's not 1 dimensional
         self.action_dim = action_dim
 
+        self.backup_entropy = False
 
-        assert target_critic_backup_type in [
+
+        assert self.target_critic_backup_type in [
             "doubleq",
             "min",
             "mean",
             "redq",
-        ], f"{target_critic_backup_type} is not a valid target critic backup type"
+        ], f"{self.target_critic_backup_type} is not a valid target critic backup type"
 
-        assert actor_gradient_type in [
+        assert self.actor_gradient_type in [
             "reinforce",
             "reparametrize",
-        ], f"{actor_gradient_type} is not a valid type of actor gradient update"
+        ], f"{self.actor_gradient_type} is not a valid type of actor gradient update"
 
         assert (
-            target_update_period is not None or soft_target_update_rate is not None
+            self.target_update_period is not None or self.soft_target_update_rate is not None
         ), "Must specify either target_update_period or soft_target_update_rate"
 
-        self.actor = MLP2(ac_dim=self.action_dim, ob_dim = self.obs_shape, discrete=False, n_layers=2, size=self.hidden_dim, state_dependent_std=True)
+        self.actor = MLP2(ac_dim=self.action_dim, ob_dim = self.obs_shape, discrete=False, n_layers=2, layer_size=self.hidden_dim, state_dependent_std=True)
         self.actor_optimizer = optim.AdamW(self.actor.parameters())
         self.actor_lr_scheduler = optim.lr_scheduler.ConstantLR(self.actor_optimizer, factor=1.0)
 
         self.critics = nn.ModuleList(
             [
-                MLP(self.obs_shape + self.action_dim, [self.hidden_dim] * 2, 1)
-                for _ in range(num_critic_networks)
+                StateActionCritic(self.obs_shape, self.action_dim, 2, self.hidden_dim)
+                for _ in range(self.num_critic_networks)
             ]
         )
 
@@ -67,8 +70,8 @@ class cagent(nn.Module):
         self.critic_lr_scheduler = optim.lr_scheduler.ConstantLR(self.critic_optimizer, factor=1.0)
         self.target_critics = nn.ModuleList(
             [
-                MLP(self.obs_shape + self.action_dim, [self.hidden_dim] * 2, 1)
-                for _ in range(num_critic_networks)
+                StateActionCritic(self.obs_shape, self.action_dim, 2, self.hidden_dim)
+                for _ in range(self.num_critic_networks)
             ]
         )
         self.update_target_critic()
@@ -81,6 +84,7 @@ class cagent(nn.Module):
             -1.0 * self.total_steps / self.epsilon_decay
         )
 
+
     def get_action(self, observation: np.ndarray) -> np.ndarray:
         """
         Compute the action for a given observation.
@@ -90,13 +94,13 @@ class cagent(nn.Module):
             -1.0 * self.total_steps / self.epsilon_decay
         )
         with torch.no_grad():
-            observation = ptu.from_numpy(observation)[None]
+            observation = from_numpy(observation)[None]
 
             action_distribution: torch.distributions.Distribution = self.actor(observation)
             action: torch.Tensor = action_distribution.sample()
 
             assert action.shape == (1, self.action_dim), action.shape
-            return ptu.to_numpy(action).squeeze(0)
+            return to_numpy(action).squeeze(0)
 
     def critic(self, obs: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         """
@@ -289,8 +293,11 @@ class cagent(nn.Module):
 
         return {
             "critic_loss": loss.item(),
+            "q_net_loss": loss.item(), 
             "q_values": q_values.mean().item(),
+            "q_value": q_values.mean().item(), 
             "target_values": target_values.mean().item(),
+            "target_value": target_values.mean().item(), 
         }
 
     def entropy(self, action_distribution: torch.distributions.Distribution):

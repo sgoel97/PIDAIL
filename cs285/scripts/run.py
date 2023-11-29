@@ -12,7 +12,8 @@ from infrastructure.buffer import ReplayBuffer
 from infrastructure.misc_utils import *
 from infrastructure.state_utils import *
 from infrastructure.plotting_utils import *
-from agents.agent import Agent
+from agents.agent import Agent 
+from agents.cagent import CAgent
 
 
 def training_loop(env_name, using_demos, prune):
@@ -25,7 +26,7 @@ def training_loop(env_name, using_demos, prune):
     if discrete:
         agent = Agent(env.observation_space.shape[0], env.action_space.n)
     else:
-        agent = Agent(env.observation_space.shape[0], env.action_space.shape[0])
+        agent = CAgent(env.observation_space.shape[0], env.action_space.shape[0]) # new update! 
 
     replay_buffer = ReplayBuffer()
     total_steps = 1000
