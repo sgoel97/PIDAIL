@@ -12,6 +12,7 @@ from infrastructure.buffer import ReplayBuffer
 from infrastructure.misc_utils import *
 from infrastructure.state_utils import *
 from infrastructure.plotting_utils import *
+from infrastructure.eval_utils import *
 from agents.agent import Agent 
 from agents.cagent import CAgent
 
@@ -20,6 +21,7 @@ def training_loop(env_name, using_demos, prune):
     # Set up environment, hyperparameters, and data storage
     gym_env_name = get_env(env_name)
     env = gym.make(gym_env_name)
+    eval_env = gym.make(gym_env_name)
     # TODO: action dim for the agent network really only works with discrete action spaces
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
 
@@ -29,7 +31,7 @@ def training_loop(env_name, using_demos, prune):
         agent = CAgent(env.observation_space.shape[0], env.action_space.shape[0]) # new update! 
 
     replay_buffer = ReplayBuffer()
-    total_steps = 1000
+    total_steps = 3000
     non_learning_steps = 50
     batch_size = 32
     losses = []
@@ -82,16 +84,16 @@ def training_loop(env_name, using_demos, prune):
         print(f"Replay buffer size: {len(replay_buffer)}")
 
     # Main training loop
-    observation, _ = env.reset()
+    observation = env.reset()
     for i in tqdm(range(total_steps)):
         action = agent.get_action(observation)
-        next_observation, reward, terminated, truncated, _ = env.step(action)
+        next_observation, reward, terminated, truncated = env.step(action)
         replay_buffer.insert(
             observation, action, reward, next_observation, terminated and not truncated
         )
 
         if terminated or truncated:
-            observation, _ = env.reset()
+            observation = env.reset()
         else:
             observation = next_observation
 
@@ -117,6 +119,19 @@ def training_loop(env_name, using_demos, prune):
 
             if not discrete:
                 actor_losses.append(0)
+
+    # Evaluate at end
+    trajectories = sample_n_trajectories(
+        eval_env,
+        policy=agent,
+        ntraj=10,
+        max_length=10000,
+    )
+    returns = [t["episode_statistics"]["r"] for t in trajectories]
+    ep_lens = [t["episode_statistics"]["l"] for t in trajectories]
+
+    print("eval return:", np.mean(returns))
+    print("episode length:", np.mean(ep_lens))
 
     # Save networks
     data_path = save_networks(using_demos, prune, env_name, agent)
