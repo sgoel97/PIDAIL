@@ -1,5 +1,5 @@
 class Trajectory:
-    similarity_threshold = 0.4999988  # TODO: currently arbitrary
+    similarity_threshold = 0.4999988  # FIXME: currently arbitrary
 
     def __init__(self):
         self.transitions = []

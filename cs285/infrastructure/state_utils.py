@@ -119,7 +119,7 @@ def get_group_measures(transition_groups, method="variance"):
 
 
 def filter_transition_groups(
-    transition_groups, size_treshold=10, measure_cutoff=80, method="variance"
+    transition_groups, size_threshold=10, measure_cutoff=80, method="variance"
 ):
     assert method in ["variance", "entropy"]
     measures = get_group_measures(transition_groups, method="variance")
@@ -127,7 +127,7 @@ def filter_transition_groups(
     measure_mask = np.array(measures) < measure_threshold
 
     group_sizes = np.array(list(map(len, transition_groups)))
-    group_size_mask = group_sizes < size_treshold
+    group_size_mask = group_sizes < size_threshold
 
     valid_transition_groups = [
         transition_groups[i]

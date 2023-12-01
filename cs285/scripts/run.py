@@ -19,9 +19,8 @@ def training_loop(env_name, using_demos, prune):
     # Set up environment, hyperparameters, and data storage
     gym_env_name = get_env(env_name)
     env = gym.make(gym_env_name)
-    # TODO: action dim for the agent network really only works with discrete action spaces
+    # FIXME: action dim for the agent network really only works with discrete action spaces
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
-
     if discrete:
         agent = Agent(env.observation_space.shape[0], env.action_space.n)
     else:
@@ -39,7 +38,6 @@ def training_loop(env_name, using_demos, prune):
     # load the expert data into the replay buffer
     if using_demos:
         expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
-
         trajectories = create_trajectories(expert_file_path)
 
         if prune:
@@ -49,7 +47,7 @@ def training_loop(env_name, using_demos, prune):
             print(f"Average group size: {avg_group_size}")
 
             filtered_transition_groups = filter_transition_groups(
-                transition_groups, size_treshold=8, measure_cutoff=80
+                transition_groups, size_threshold=8, measure_cutoff=80
             )
             avg_group_size = np.mean(list(map(len, filtered_transition_groups)))
             print(f"Number of filtered groups: {len(filtered_transition_groups)}")
