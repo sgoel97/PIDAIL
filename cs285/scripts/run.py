@@ -12,27 +12,39 @@ from infrastructure.buffer import ReplayBuffer
 from infrastructure.misc_utils import *
 from infrastructure.state_utils import *
 from infrastructure.plotting_utils import *
+from infrastructure.eval_utils import *
+from infrastructure.scripting_utils import *
 from agents.agent import Agent
+from agents.cagent import CAgent
 
 
-def training_loop(env_name, using_demos, prune):
+total_steps = 10000
+non_learning_steps = 100
+batch_size = 100
+
+
+def training_loop(env_name, using_demos, prune, config):
     # Set up environment, hyperparameters, and data storage
     gym_env_name = get_env(env_name)
     env = gym.make(gym_env_name)
-    # FIXME: action dim for the agent network really only works with discrete action spaces
-    discrete = isinstance(env.action_space, gym.spaces.Discrete)
-    if discrete:
-        agent = Agent(env.observation_space.shape[0], env.action_space.n)
-    else:
-        agent = Agent(env.observation_space.shape[0], env.action_space.shape[0])
+    eval_env = gym.make(gym_env_name)
 
+    # Set up agents
+    discrete = isinstance(env.action_space, gym.spaces.Discrete)
+    obs_dim = env.observation_space.shape[0]
+    ac_dim = env.action_space.n if discrete else env.action_space.shape[0]
+    if discrete:
+        agent = Agent(obs_dim, ac_dim, **config)
+    else:
+        agent = CAgent(obs_dim, ac_dim, **config)
+
+    # Set up replay buffer
     replay_buffer = ReplayBuffer()
-    total_steps = 1000
-    non_learning_steps = 50
-    batch_size = 32
-    losses = []
-    q_values = []
-    target_values = []
+
+    # Set up logging
+    losses, q_values, target_values = [], [], []
+    if not discrete:
+        actor_losses = []
 
     # If agent is using expert demos to learn instead of learning from scratch,
     # load the expert data into the replay buffer
@@ -80,6 +92,7 @@ def training_loop(env_name, using_demos, prune):
     for i in tqdm(range(total_steps)):
         action = agent.get_action(observation)
         next_observation, reward, terminated, truncated, _ = env.step(action)
+
         replay_buffer.insert(
             observation, action, reward, next_observation, terminated and not truncated
         )
@@ -101,16 +114,37 @@ def training_loop(env_name, using_demos, prune):
             losses.append(update_info["q_net_loss"])
             q_values.append(update_info["q_value"])
             target_values.append(update_info["target_value"])
+
+            if not discrete:
+                actor_losses.append(update_info["actor_loss"])
         else:
             losses.append(0)
             q_values.append(0)
             target_values.append(0)
 
+            if not discrete:
+                actor_losses.append(0)
+
+    # Evaluate at end
+    trajectories = sample_n_trajectories(
+        eval_env, policy=agent, ntraj=10, max_length=10000
+    )
+    returns = [t["episode_statistics"]["r"] for t in trajectories]
+    ep_lens = [t["episode_statistics"]["l"] for t in trajectories]
+
+    print("eval return:", np.mean(returns))
+    print("episode length:", np.mean(ep_lens))
+
     # Save networks
     data_path = save_networks(using_demos, prune, env_name, agent)
 
     env.close()
-    return total_steps, losses, q_values, target_values, data_path
+
+    results = {"loss": losses, "q_values": q_values, "target_values": target_values}
+    if not discrete:
+        results["actor_loss"] = actor_losses
+
+    return total_steps, results, data_path
 
 
 if __name__ == "__main__":
@@ -135,8 +169,15 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether or not to prune trajectories",
     )
+
     args = parser.parse_args()
-    total_steps, losses, q_values, target_values, data_path = training_loop(
-        args.env_name, args.demos, args.prune
+
+    config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
+
+    if not args.demos and args.prune:
+        raise NotImplementedError("Can't use prune without expert demos")
+
+    total_steps, results, data_path = training_loop(
+        args.env_name, args.demos, args.prune, config
     )
-    plot_results(total_steps, losses, q_values, target_values, data_path)
+    # plot_results(total_steps, results.values(), results.keys(), data_path)

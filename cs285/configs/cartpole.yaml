@@ -1,0 +1,7 @@
+hidden_size: 64
+discount: 0.99
+target_update_period: 5
+start_epsilon: 0.9
+end_epsilon: 0.05
+epsilon_decay: 1000
+learning_rate: 0.001

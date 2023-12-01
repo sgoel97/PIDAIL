@@ -1,0 +1,15 @@
+hidden_size: 64
+discount: 0.99
+target_update_period: 1000
+start_epsilon: 0.09
+end_epsilon: 0.005
+epsilon_decay: 1000
+
+target_critic_backup_type: "doubleq"
+soft_target_update_rate: null
+actor_gradient_type: "reparametrize"
+num_actor_samples: 1
+num_critic_updates: 1
+num_critic_networks: 2
+use_entropy_bonus: False
+backup_entropy: True
