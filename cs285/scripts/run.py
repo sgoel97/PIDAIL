@@ -170,6 +170,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether or not to prune trajectories",
     )
+    parser.add_argument(
+        "--graph", 
+        "-g",
+        action="store_true", 
+        help="Whether or not to graph results",
+    )
 
     args = parser.parse_args()
 
@@ -181,4 +187,6 @@ if __name__ == "__main__":
     total_steps, results, data_path = training_loop(
         args.env_name, args.demos, args.prune, config
     )
-    # plot_results(total_steps, results.values(), results.keys(), data_path)
+    
+    if args.graph:
+        plot_results(total_steps, results.values(), results.keys(), data_path)
