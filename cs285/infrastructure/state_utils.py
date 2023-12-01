@@ -15,6 +15,7 @@ def create_trajectories(expert_file_path):
     Each demo has batch_size observations, batch_size actions, batch_size next_observations, etc.
     We define that one demo is one trajectory (which is a standard definition if we assume that
     the expert data files ARE giving us n trajectories).
+
     Thus the ith state along a trajectory will be made of the obs, action, next_obs, reward, and
     done located at the ith index in their respective arrays.
     """

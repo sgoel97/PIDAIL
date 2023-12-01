@@ -9,7 +9,7 @@ def plot_results(total_steps, values, names, save_path):
 
     for value, name in zip(values, names):
         plt.plot(x_range, value, label=name)
-    
+
     plt.legend()
     plt.savefig(save_path / "results.png")
     plt.show()

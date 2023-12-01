@@ -6,99 +6,133 @@ from torch import nn, optim
 import numpy as np
 
 from networks.mlp import *
-from networks.mlp2 import *
 from infrastructure.misc_utils import *
 from constants import *
 
 
-class CAgent(nn.Module):
-    def __init__(self, observation_shape: Sequence[int], action_dim: int):
-        super().__init__()
-        self.target_critic_backup_type = "doubleq"
-        self.discount = 0.99
-        self.target_update_period = 1000
-        self.soft_target_update_rate = None
-        self.actor_gradient_type = "reparametrize"
-        self.num_actor_samples = 1
-        self.num_critic_updates = 1
-        self.num_critic_networks = 2
-        self.use_entropy_bonus = False
+def check_backup_type(backup_type):
+    assert backup_type in [
+        "doubleq",
+        "min",
+        "mean",
+        "redq",
+    ], f"{backup_type} is not a valid target critic backup type"
 
-        self.start_epsilon = 0.09
-        self.end_epsilon = 0.005
-        self.epsilon_decay = 1000
+
+def check_gradient_type(gradient_type):
+    assert gradient_type in [
+        "reinforce",
+        "reparametrize",
+    ], f"{gradient_type} is not a valid type of actor gradient update"
+
+
+def check_update_period(update_period, soft_update_period):
+    assert (
+        update_period is not None or soft_update_period is not None
+    ), "Must specify either target_update_period or soft_target_update_rate"
+
+
+class CAgent(nn.Module):
+    def __init__(
+        self,
+        obs_dim: int,
+        ac_dim: int,
+        hidden_size: int,
+        discount: float,
+        target_update_period: float,
+        start_epsilon: float,
+        end_epsilon: float,
+        epsilon_decay: int,
+        target_critic_backup_type: str,
+        soft_target_update_rate: int,
+        actor_gradient_type: str,
+        num_actor_samples: int,
+        num_critic_updates: int,
+        num_critic_networks: int,
+        use_entropy_bonus: bool,
+        backup_entropy: bool,
+    ):
+        super().__init__()
+        check_backup_type(target_critic_backup_type)
+        check_gradient_type(actor_gradient_type)
+        check_update_period(target_update_period, soft_target_update_rate)
+
+        self.total_steps = 0
+        self.obs_dim = np.prod(obs_dim)  # in case it's not 1 dimensional
+        self.ac_dim = ac_dim
+        self.hidden_size = hidden_size
+
+        self.discount = discount
+        self.target_update_period = target_update_period
+        self.start_epsilon = start_epsilon
+        self.end_epsilon = end_epsilon
+        self.epsilon_decay = epsilon_decay
+
+        self.target_critic_backup_type = target_critic_backup_type
+        self.soft_target_update_rate = soft_target_update_rate
+        self.actor_gradient_type = actor_gradient_type
+        self.num_actor_samples = num_actor_samples
+        self.num_critic_updates = num_critic_updates
+        self.num_critic_networks = num_critic_networks
+        self.use_entropy_bonus = use_entropy_bonus
+        self.backup_entropy = backup_entropy
 
         self.loss_fn = nn.MSELoss()
-        self.total_steps = 0
-        self.hidden_dim = 64
 
-        self.obs_shape = np.prod(observation_shape) # in case it's not 1 dimensional
-        self.action_dim = action_dim
-
-        self.backup_entropy = True
-
-
-        assert self.target_critic_backup_type in [
-            "doubleq",
-            "min",
-            "mean",
-            "redq",
-        ], f"{self.target_critic_backup_type} is not a valid target critic backup type"
-
-        assert self.actor_gradient_type in [
-            "reinforce",
-            "reparametrize",
-        ], f"{self.actor_gradient_type} is not a valid type of actor gradient update"
-
-        assert (
-            self.target_update_period is not None or self.soft_target_update_rate is not None
-        ), "Must specify either target_update_period or soft_target_update_rate"
-
-        self.actor = MLP2(ac_dim=self.action_dim, ob_dim = self.obs_shape, discrete=False, n_layers=2, layer_size=self.hidden_dim, state_dependent_std=True)
+        self.actor = MLP(
+            ac_dim=self.ac_dim,
+            ob_dim=self.obs_dim,
+            discrete=False,
+            n_layers=2,
+            layer_size=self.hidden_size,
+            state_dependent_std=True,
+        )
         self.actor_optimizer = optim.AdamW(self.actor.parameters())
-        self.actor_lr_scheduler = optim.lr_scheduler.ConstantLR(self.actor_optimizer, factor=1.0)
+        self.actor_lr_scheduler = optim.lr_scheduler.ConstantLR(
+            self.actor_optimizer, factor=1.0
+        )
 
         self.critics = nn.ModuleList(
             [
-                StateActionCritic(self.obs_shape, self.action_dim, 2, self.hidden_dim)
+                StateActionCritic(self.obs_dim, self.ac_dim, 2, self.hidden_size)
                 for _ in range(self.num_critic_networks)
             ]
         )
-
-        self.critic_optimizer = optim.AdamW(self.critics.parameters())
-        self.critic_lr_scheduler = optim.lr_scheduler.ConstantLR(self.critic_optimizer, factor=1.0)
         self.target_critics = nn.ModuleList(
             [
-                StateActionCritic(self.obs_shape, self.action_dim, 2, self.hidden_dim)
+                StateActionCritic(self.obs_dim, self.ac_dim, 2, self.hidden_size)
                 for _ in range(self.num_critic_networks)
             ]
         )
-        self.update_target_critic()
-
+        self.critic_optimizer = optim.AdamW(self.critics.parameters())
+        self.critic_lr_scheduler = optim.lr_scheduler.ConstantLR(
+            self.critic_optimizer, factor=1.0
+        )
         self.critic_loss = nn.MSELoss()
 
         self.update_target_critic()
 
-        self.temperature = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * np.exp(
-            -1.0 * self.total_steps / self.epsilon_decay
-        )
-
+        self.temperature = self.end_epsilon + (
+            self.start_epsilon - self.end_epsilon
+        ) * np.exp(-1.0 * self.total_steps / self.epsilon_decay)
 
     def get_action(self, observation: np.ndarray) -> np.ndarray:
         """
         Compute the action for a given observation.
         """
         self.total_steps += 1
-        self.temperature = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * np.exp(
-            -1.0 * self.total_steps / self.epsilon_decay
-        )
+        self.temperature = self.end_epsilon + (
+            self.start_epsilon - self.end_epsilon
+        ) * np.exp(-1.0 * self.total_steps / self.epsilon_decay)
         with torch.no_grad():
             observation = from_numpy(observation)[None]
 
-            action_distribution: torch.distributions.Distribution = self.actor(observation)
+            action_distribution: torch.distributions.Distribution = self.actor(
+                observation
+            )
             action: torch.Tensor = action_distribution.sample()
 
-            assert action.shape == (1, self.action_dim), action.shape
+            assert action.shape == (1, self.ac_dim), action.shape
             return to_numpy(action).squeeze(0)
 
     def critic(self, obs: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
@@ -111,7 +145,9 @@ class CAgent(nn.Module):
         """
         Compute the (ensembled) target Q-values for the given state-action pair.
         """
-        return torch.stack([critic(obs, action) for critic in self.target_critics], dim=0)
+        return torch.stack(
+            [critic(obs, action) for critic in self.target_critics], dim=0
+        )
 
     def q_backup_strategy(self, next_qs: torch.Tensor) -> torch.Tensor:
         """
@@ -123,10 +159,10 @@ class CAgent(nn.Module):
          - for clip-Q, clip to the minimum of the two critics' predictions.
 
         Parameters:
-            next_qs (torch.Tensor): Q-values of shape (num_critics, batch_size). 
+            next_qs (torch.Tensor): Q-values of shape (num_critics, batch_size).
                 Leading dimension corresponds to target values FROM the different critics.
         Returns:
-            torch.Tensor: Target values of shape (num_critics, batch_size). 
+            torch.Tensor: Target values of shape (num_critics, batch_size).
                 Leading dimension corresponds to target values FOR the different critics.
         """
 
@@ -173,7 +209,11 @@ class CAgent(nn.Module):
         # If our backup strategy removed a dimension, add it back in explicitly
         # (assume the target for each critic will be the same)
         if next_qs.shape == (batch_size,):
-            next_qs = next_qs[None].expand((self.num_critic_networks, batch_size)).contiguous()
+            next_qs = (
+                next_qs[None]
+                .expand((self.num_critic_networks, batch_size))
+                .contiguous()
+            )
 
         assert next_qs.shape == (
             self.num_critic_networks,
@@ -241,38 +281,23 @@ class CAgent(nn.Module):
             ), target_values.shape
 
             if self.use_entropy_bonus and self.backup_entropy:
-                # TODO(student): Add entropy bonus to the target values for SAC
-                # Make sure to use the temperature parameter!
-                # Hint: Make sure your entropy bonus has compatible dimensions! (Watch out for broadcasting)
-                """
-                next_action_entropy = ...
-                next_qs += ...
-                """
                 next_action_entropy = self.entropy(next_action_distribution)
 
-                next_action_entropy = next_action_entropy[None].expand(
-                    (self.num_critic_networks, batch_size)
-                ).contiguous()
-                assert next_action_entropy.shape == next_qs.shape, next_action_entropy.shape
-                next_qs -= (self.temperature * next_action_entropy)
-                # ENDTODO
+                next_action_entropy = (
+                    next_action_entropy[None]
+                    .expand((self.num_critic_networks, batch_size))
+                    .contiguous()
+                )
+                assert (
+                    next_action_entropy.shape == next_qs.shape
+                ), next_action_entropy.shape
+                next_qs -= self.temperature * next_action_entropy
 
-        # TODO(student): Update the critic
-        """
-        # Predict Q-values
-        q_values = ...
-        assert q_values.shape == (self.num_critic_networks, batch_size), q_values.shape
-
-        # Compute loss
-        loss: torch.Tensor = ...
-        """
         # Predict Q-values
         q_values = self.critic(obs, action)
         assert q_values.shape == (self.num_critic_networks, batch_size), q_values.shape
 
-        # Compute loss
         loss: torch.Tensor = self.critic_loss(q_values, target_values)
-        # ENDTODO
 
         self.critic_optimizer.zero_grad()
         loss.backward()
@@ -280,57 +305,36 @@ class CAgent(nn.Module):
 
         return {
             "critic_loss": loss.item(),
-            "q_net_loss": loss.item(), 
+            "q_net_loss": loss.item(),
             "q_values": q_values.mean().item(),
-            "q_value": q_values.mean().item(), 
+            "q_value": q_values.mean().item(),
             "target_values": target_values.mean().item(),
-            "target_value": target_values.mean().item(), 
+            "target_value": target_values.mean().item(),
         }
 
     def entropy(self, action_distribution: torch.distributions.Distribution):
         """
         Compute the (approximate) entropy of the action distribution for each batch element.
         """
-
-        # TODO(student): Compute the entropy of the action distribution.
-        """
-        # Note: Think about whether to use .rsample() or .sample() here...
-        return ...
-        """
         return -action_distribution.log_prob(action_distribution.rsample())
-        # ENDTODO
 
     def actor_loss_reinforce(self, obs: torch.Tensor):
         batch_size = obs.shape[0]
 
-        # TODO(student): Generate an action distribution
-        """
-        action_distribution: torch.distributions.Distribution = ...
-        """
         action_distribution: torch.distributions.Distribution = self.actor(obs)
-        # ENDTODO
 
         with torch.no_grad():
-            # TODO(student): draw num_actor_samples samples from the action distribution for each batch element
-            """
-            action = ...
-            """
             action = action_distribution.sample(sample_shape=(self.num_actor_samples,))
-            # ENDTODO
+
             assert action.shape == (
                 self.num_actor_samples,
                 batch_size,
-                self.action_dim,
+                self.ac_dim,
             ), action.shape
 
-            # TODO(student): Compute Q-values for the current state-action pair
-            """
-            q_values = ...
-            """
             q_values = self.critic(
                 obs[None].repeat((self.num_actor_samples, 1, 1)), action
             )
-            # ENDTODO
             assert q_values.shape == (
                 self.num_critic_networks,
                 self.num_actor_samples,
@@ -341,12 +345,6 @@ class CAgent(nn.Module):
             q_values = torch.mean(q_values, axis=0)
             advantage = q_values
 
-        # Do REINFORCE: calculate log-probs and use the Q-values
-        # TODO(student)
-        """
-        log_probs = ...
-        loss = ...
-        """
         log_probs: torch.Tensor = action_distribution.log_prob(action)
         torch.nan_to_num_(log_probs, nan=0.0, posinf=0.0, neginf=0.0)
         assert log_probs.shape == (
@@ -356,7 +354,6 @@ class CAgent(nn.Module):
 
         # Compute the loss
         loss = torch.mean(-(advantage * log_probs))
-        # ENDTODO
 
         return loss, torch.mean(self.entropy(action_distribution))
 
@@ -366,37 +363,21 @@ class CAgent(nn.Module):
         # Sample from the actor
         action_distribution: torch.distributions.Distribution = self.actor(obs)
 
-        # TODO(student): Sample actions
-        """
-        # Note: Think about whether to use .rsample() or .sample() here...
-        action = ...
-        """
         action = action_distribution.rsample(sample_shape=(self.num_actor_samples,))
         assert action.shape == (
             self.num_actor_samples,
             batch_size,
-            self.action_dim,
+            self.ac_dim,
         ), action.shape
-        # ENDTODO
 
-        # TODO(student): Compute Q-values for the sampled state-action pair
-        """
-        q_values = ...
-        """
         q_values = self.critic(obs[None].repeat((self.num_actor_samples, 1, 1)), action)
         assert q_values.shape == (
             self.num_critic_networks,
             self.num_actor_samples,
             batch_size,
         ), q_values.shape
-        # ENDTODO
 
-        # TODO(student): Compute the actor loss
-        """
-        loss = ...
-        """
         loss = torch.mean(-q_values)
-        # ENDTODO
 
         return loss, torch.mean(self.entropy(action_distribution))
 
@@ -445,28 +426,15 @@ class CAgent(nn.Module):
         """
 
         critic_infos = []
-        # TODO(student): Update the critic for num_critic_upates steps, and add the output stats to critic_infos
+
         for _ in range(self.num_critic_updates):
             info = self.update_critic(
                 observations, actions, rewards, next_observations, dones
             )
             critic_infos.append(info)
-        # ENDTODO
 
-        # TODO(student): Update the actor
-        """
-        actor_info = ...
-        """
         actor_info = self.update_actor(observations)
-        # ENDTODO
 
-        # TODO(student): Perform either hard or soft target updates.
-        """
-        # Relevant variables:
-        #  - step
-        #  - self.target_update_period (None when using soft updates)
-        #  - self.soft_target_update_rate (None when using hard updates)
-        """
         if (
             self.target_update_period is not None
             and self.total_steps % self.target_update_period == 0
@@ -474,7 +442,6 @@ class CAgent(nn.Module):
             self.update_target_critic()
         elif self.soft_target_update_rate is not None:
             self.soft_update_target_critic(self.soft_target_update_rate)
-        # ENDTODO
 
         # Average the critic info over all of the steps
         critic_info = {
