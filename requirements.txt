@@ -4,3 +4,4 @@ pandas
 torch
 matplotlib
 tqdm
+stable-baselines3[extra]

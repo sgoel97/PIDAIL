@@ -2,7 +2,7 @@ import numpy as np
 
 
 class ReplayBuffer:
-    def __init__(self, capacity=10000):
+    def __init__(self, capacity=10000, device="cpu"):
         self.capacity = capacity
         self.curr_size = 0
         self.observations = None
@@ -10,6 +10,7 @@ class ReplayBuffer:
         self.rewards = None
         self.next_observations = None
         self.dones = None
+        self.device = device
 
     def __len__(self):
         return self.curr_size

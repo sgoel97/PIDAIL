@@ -4,7 +4,8 @@ from pathlib import Path
 import torch
 
 from constants import *
-from agents import *
+
+# from agents import *
 
 
 def from_numpy(data):
