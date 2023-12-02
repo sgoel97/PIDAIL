@@ -19,7 +19,7 @@ from infrastructure.scripting_utils import *
 from infrastructure.agent_utils import *
 
 discrete_agents = ["dqn"]
-continous_agents = ["sac"]
+continous_agents = ["sac", "td3"]
 
 
 def training_loop(env_name, using_demos, prune, config, agent=None):
@@ -106,8 +106,11 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
     agent.learn(total_timesteps=total_steps, callback=eval_callback, progress_bar=True)
 
     # Evaluate at end
-    avg_eval_return, std_eval_return = evaluate_policy(agent, env, n_eval_episodes=100)
+    avg_eval_return, std_eval_return = evaluate_policy(
+        agent, eval_env, n_eval_episodes=10
+    )
 
+    print("These arent that accurate:\n#################")
     print("avg. eval return:", avg_eval_return)
     print("std. eval return:", std_eval_return)
 
@@ -120,7 +123,7 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
-    agent_choices = ["dqn", "sac"]
+    agent_choices = discrete_agents + continous_agents
 
     parser.add_argument(
         "--env_name",

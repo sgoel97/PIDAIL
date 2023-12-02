@@ -1,6 +1,8 @@
 import constants
+import numpy as np
 
-from stable_baselines3 import DQN, SAC
+from stable_baselines3 import DQN, SAC, TD3
+from stable_baselines3.common.noise import NormalActionNoise
 
 
 def get_default_agent(agent, discrete, default_discrete="dqn", default_continous="sac"):
@@ -17,9 +19,16 @@ def get_agent(agent, env, config):
     if agent == "dqn":
         # https://stable-baselines3.readthedocs.io/en/master/modules/dqn.html
         agent = DQN("MlpPolicy", env, **config["dqn"], **global_config)
-    else:
+    elif agent == "sac":
         # https://stable-baselines3.readthedocs.io/en/master/modules/sac.html
         agent = SAC("MlpPolicy", env, **config["sac"], **global_config)
+    else:
+        n_actions = env.action_space.shape[-1]
+        action_noise = NormalActionNoise(
+            mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions)
+        )
+        agent = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1)
+
     return agent
 
 

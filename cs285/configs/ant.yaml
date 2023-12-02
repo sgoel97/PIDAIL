@@ -1,3 +1,5 @@
 total_steps: 100000
 
 sac: { learning_starts: 10000, use_sde: false }
+
+td3: { learning_starts: 10000 }
