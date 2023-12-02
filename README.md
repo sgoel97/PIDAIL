@@ -24,28 +24,27 @@ Next Steps:
 
 - **General Purpose Deep RL Libraries to Use:**
 
-  - [Stable-Baselines3](https://stable-baselines3.readthedocs.io/en/master/)
-    Contains standard algorithms and ways to evaluate models
+  - [Stable-Baselines3](https://stable-baselines3.readthedocs.io/en/master/): Contains standard algorithms and ways to evaluate models
 
-  - [RL Baselines3 Zoo](https://github.com/DLR-RM/rl-baselines3-zoo)
-    Contains pretrained agents and optimized hyperparams for models
+  - [RL Baselines3 Zoo](https://github.com/DLR-RM/rl-baselines3-zoo): Contains pretrained agents and optimized hyperparams for models
 
 - **Specialized Libraries to Use:**
 
-  - [DL Engine](https://github.com/opendilab/DI-engine)
-    Has many, many algorithms and a ton of environments to choose from
+  - [DL Engine](https://github.com/opendilab/DI-engine): Has many, many algorithms and a ton of environments to choose from
 
-  - [RL for MuJoCo](https://github.com/aravindr93/mjrl)
-    Has DAPG implementation
+  - [RL for MuJoCo](https://github.com/aravindr93/mjrl): Has DAPG implementation
 
 - **Papers and Algos to Look at:**
 
   - [DQFD Paper](https://arxiv.org/pdf/1704.03732.pdf)
+
     Implementations:
 
     - TF Implementation: [https://github.com/go2sea/DQfD](https://github.com/go2sea/DQfD)
     - TF Implementation: [https://github.com/felix-kerkhoff/DQfD](https://github.com/felix-kerkhoff/DQfD)
 
   - [DAPG Paper](https://www.roboticsproceedings.org/rss14/p49.pdf)
+
     Implementations:
+
     - Data and Dataloading Implementation: [https://github.com/aravindr93/hand_dapg](https://github.com/aravindr93/hand_dapg)
