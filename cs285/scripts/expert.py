@@ -1,26 +1,61 @@
-import tempfile
+import pickle
 
 import numpy as np
 import gymnasium as gym
+
+import os
+
+from tqdm import tqdm
+
+from huggingface_sb3 import load_from_hub
+from stable_baselines3 import PPO, DQN
 from stable_baselines3.common.evaluation import evaluate_policy
 
-from imitation.policies.serialize import load_policy
-from imitation.util.util import make_vec_env
+ENV_NAME = "LunarLander-v2"
 
-rng = np.random.default_rng(0)
-env = make_vec_env(
-    "seals:seals/Ant-v1",
-    rng=rng,
+# Retrieve the model from the hub
+## repo_id = id of the model repository from the Hugging Face Hub (repo_id = {organization}/{repo_name})
+## filename = name of the model zip file from the repository including the extension .zip
+checkpoint = load_from_hub(
+    repo_id=f"sb3/ppo-{ENV_NAME}",
+    filename=f"ppo-{ENV_NAME}.zip",
 )
-expert = load_policy(
-    "ppo-huggingface",
-    organization="HumanCompatibleAI",
-    env_name="seals-Ant-v1",
-    venv=env,
-)
+expert = PPO.load(checkpoint)
 
-obs = vec_env.reset()
-for i in range(1000): # changeable
-    action, _states = model.predict(obs, deterministic=True)
-    obs, rewards, dones, info = vec_env.step(action)
-    # TODO store these into pickle/parquet files
+env = gym.make(ENV_NAME)
+
+demos = []
+
+eval_env = gym.make(ENV_NAME)
+mean_reward, std_reward = evaluate_policy(
+    expert, eval_env, render=True, n_eval_episodes=10, deterministic=True, warn=False
+)
+print(f"mean_reward={mean_reward} +/- {std_reward}")
+
+for traj in range(3): # changeable
+    observations = []
+    actions = []
+    next_observations = []
+    rewards = []
+    dones = []
+
+    obs, _ = env.reset()
+    for i in tqdm(range(1000)): # changeable
+        action, _states = expert.predict(obs, deterministic=True)
+        next_obs, reward, done, info, _ = env.step(action)
+        observations.append(obs)
+        actions.append(action)
+        next_observations.append(next_obs)
+        rewards.append(reward)
+        dones.append(done)
+        if done:
+            break
+        else:
+            obs = next_obs
+        # TODO store these into pickle/parquet files
+
+    demo = {"observation": observations, "action": actions, "reward":rewards}
+    demos.append(demo)
+
+with open(f"{os.getcwd()}/cs285/experts/expert_data_{ENV_NAME}.pkl", "wb") as f:
+    pickle.dump(demos, f)
