@@ -1,7 +1,16 @@
-hidden_size: 64
-discount: 0.99
-target_update_period: 5
-start_epsilon: 0.9
-end_epsilon: 0.05
-epsilon_decay: 1000
-learning_rate: 0.001
+total_steps: 100000
+
+dqn:
+  {
+    batch_size: 64,
+    buffer_size: 100000,
+    exploration_final_eps: 0.04,
+    exploration_fraction: 0.16,
+    gamma: 0.99,
+    gradient_steps: 128,
+    learning_rate: 0.0023,
+    learning_starts: 1000,
+    policy_kwargs: { net_arch: [256, 256] },
+    target_update_interval: 10,
+    train_freq: 256,
+  }

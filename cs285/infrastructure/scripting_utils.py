@@ -1,6 +1,4 @@
 import yaml
-import os
-import time
 
 
 def make_config(config_file: str) -> dict:
