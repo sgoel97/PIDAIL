@@ -1,0 +1,3 @@
+total_steps: 10000
+
+dqn: { learning_starts: 10000 }

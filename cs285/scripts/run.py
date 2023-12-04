@@ -7,10 +7,19 @@ sys.path.append(os.getcwd() + "/cs285/")
 import gymnasium as gym
 from datetime import datetime
 
+from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
+
+import tempfile
+from imitation.algorithms import bc
+from imitation.policies.serialize import load_policy
+from imitation.data import rollout
+from imitation.util.util import make_vec_env
+from imitation.data.wrappers import RolloutInfoWrapper
+from imitation.algorithms.dagger import SimpleDAggerTrainer
 
 from infrastructure.misc_utils import *
 from infrastructure.state_utils import *
@@ -28,8 +37,7 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
     gym_env_name = get_env(env_name)
 
     # Set up defaults
-    discrete = isinstance(gym.make(gym_env_name).action_space, gym.spaces.Discrete)
-    agent_name = get_default_agent(agent, discrete)
+    agent_name = "dqn" if agent is None else agent
 
     # Set up logging
     timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
@@ -37,8 +45,20 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
     logger = configure(log_dir, ["tensorboard"])
 
     # Set up environment
-    env = Monitor(gym.make(gym_env_name), filename=log_dir + "/train")
-    eval_env = Monitor(gym.make(gym_env_name), filename=log_dir + "/eval")
+    rng = np.random.default_rng(0)
+    # env = Monitor(gym.make(gym_env_name), filename=log_dir + "/train")
+    # eval_env = Monitor(gym.make(gym_env_name), filename=log_dir + "/eval")
+
+    env = make_vec_env(
+        gym_env_name,
+        rng=rng,
+        post_wrappers=[lambda env, _: RolloutInfoWrapper(env)],
+    )
+    eval_env = make_vec_env(
+        gym_env_name,
+        rng=rng,
+        post_wrappers=[lambda env, _: RolloutInfoWrapper(env)],
+    )
 
     # Set up agents
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
@@ -56,6 +76,36 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
         verbose=0,
         render=False,
     )
+
+    # Train Dagger
+    if using_demos:
+        expert = load_policy(
+            "ppo-huggingface",
+            organization="HumanCompatibleAI",
+            env_name=gym_env_name,
+            venv=env,
+        )
+
+        bc_trainer = bc.BC(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            rng=rng,
+        )
+
+        with tempfile.TemporaryDirectory(prefix="dagger_example_") as tmpdir:
+            print(tmpdir)
+            dagger_trainer = SimpleDAggerTrainer(
+                venv=env,
+                scratch_dir=tmpdir,
+                expert_policy=expert,
+                bc_trainer=bc_trainer,
+                rng=rng,
+            )
+            dagger_trainer.train(total_steps, bc_train_kwargs={"progress_bar": True})
+
+        agent = dagger_trainer.policy
+    else:
+        agent.learn(total_steps, callback=eval_callback, progress_bar=True)
 
     # Set up replay buffer
     # replay_buffer = ReplayBuffer()
@@ -102,15 +152,11 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
 
     #     print(f"Replay buffer size: {len(replay_buffer)}")
 
-    # Main training loop
-    agent.learn(total_timesteps=total_steps, callback=eval_callback, progress_bar=True)
-
     # Evaluate at end
     avg_eval_return, std_eval_return = evaluate_policy(
         agent, eval_env, n_eval_episodes=10
     )
 
-    print("These arent that accurate:\n#################")
     print("avg. eval return:", avg_eval_return)
     print("std. eval return:", std_eval_return)
 
