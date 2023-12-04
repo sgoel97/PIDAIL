@@ -5,11 +5,13 @@ from stable_baselines3 import DQN, SAC, TD3
 from stable_baselines3.common.noise import NormalActionNoise
 
 
-def get_default_agent(agent, discrete, default_discrete="dqn", default_continous="sac"):
+def get_default_agent(agent, discrete, using_demos):
+    if using_demos:
+        agent = "bc" if agent is None else agent
     if discrete:
-        agent = default_discrete if agent is None else agent
+        agent = "dqn" if agent is None else agent
     else:
-        agent = default_continous if agent is None else agent
+        agent = "sac" if agent is None else agent
     return agent
 
 

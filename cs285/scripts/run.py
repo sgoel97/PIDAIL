@@ -27,22 +27,22 @@ from imitation.rewards.reward_nets import BasicRewardNet
 from imitation.util.networks import RunningNorm
 
 from infrastructure.misc_utils import *
-from infrastructure.state_utils import *
+from infrastructure.imitation_state_utils import *
 from infrastructure.plotting_utils import *
 from infrastructure.scripting_utils import *
-from infrastructure.agent_utils import *
+from infrastructure.imitation_agent_utils import *
 
 discrete_agents = ["dqn", "sqil", "dagger", "bc"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
 
 
-def training_loop(env_name, using_demos, prune, config, agent=None):
+def training_loop(env_name, using_demos, prune, config, agent, seed):
     # Set up environment, hyperparameters, and data storage
     total_steps = config["total_steps"]
     gym_env_name = get_env(env_name)
 
     # Set up environment
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(seed)
     # env = Monitor(gym.make(gym_env_name), filename=log_dir + "/train")
     # eval_env = Monitor(gym.make(gym_env_name), filename=log_dir + "/eval")
 
@@ -59,7 +59,7 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
 
     # Set up defaults
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
-    agent_name = get_default_agent(agent, discrete)
+    agent_name = get_default_agent(agent, discrete, using_demos)
     check_agent_env(agent_name, discrete, discrete_agents, continous_agents)
 
     # Set up logging
@@ -80,7 +80,22 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
     if using_demos:
         expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
         rollouts = create_imitation_trajectories(expert_file_path)
-        transitions = rollout.flatten_trajectories(rollouts)
+        transitions = rollout.flatten_trajectories_with_rew(rollouts)
+
+        # print(transitions, type(transitions), transitions.obs)
+
+        if prune:
+            prune_config = config["prune_config"]
+
+            groups = group_transitions(transitions, prune_config)
+            print("Before Filtering:\n############################")
+            print_group_stats(groups)
+
+            filtered_groups = filter_transition_groups(groups, prune_config)
+            print("\nAfter Filtering:\n############################")
+            print_group_stats(filtered_groups)
+
+            transitions = collate_transitions(filtered_groups)
 
         # BC
         if agent_name == "bc":
@@ -169,51 +184,6 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
         agent.set_logger(logger)
         agent.learn(total_steps, callback=eval_callback, progress_bar=True)
 
-    # Set up replay buffer
-    # replay_buffer = ReplayBuffer()
-
-    # If agent is using expert demos to learn instead of learning from scratch,
-    # load the expert data into the replay buffer
-    # if using_demos:
-    #     expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
-
-    #     trajectories = create_trajectories(expert_file_path)
-
-    #     if prune:
-    #         transition_groups = get_similar_transitions(trajectories)
-    #         avg_group_size = np.mean(list(map(len, transition_groups)))
-    #         print(f"Number of transition groups: {len(transition_groups)}")
-    #         print(f"Average group size: {avg_group_size}")
-
-    #         filtered_transition_groups = filter_transition_groups(
-    #             transition_groups, size_treshold=8, measure_cutoff=80
-    #         )
-    #         avg_group_size = np.mean(list(map(len, filtered_transition_groups)))
-    #         print(f"Number of filtered groups: {len(filtered_transition_groups)}")
-    #         print(f"Average filtered group size: {avg_group_size}")
-
-    #         for group in filtered_transition_groups:
-    #             for transition in group:
-    #                 replay_buffer.insert(
-    #                     transition.obs,
-    #                     transition.action,
-    #                     transition.reward,
-    #                     transition.next_obs,
-    #                     transition.done,
-    #                 )
-    #     else:
-    #         for trajectory in trajectories:
-    #             for transition in trajectory.transitions:
-    #                 replay_buffer.insert(
-    #                     transition.obs,
-    #                     transition.action,
-    #                     transition.reward,
-    #                     transition.next_obs,
-    #                     transition.done,
-    #                 )
-
-    #     print(f"Replay buffer size: {len(replay_buffer)}")
-
     # Evaluate at end
     avg_eval_return, std_eval_return = evaluate_policy(
         agent, eval_env, n_eval_episodes=10
@@ -265,6 +235,12 @@ if __name__ == "__main__":
         help=f"Choices are {agent_choices}",
         default=None,
     )
+    parser.add_argument(
+        "--seed",
+        "-s",
+        help=f"random seed for reproducibility",
+        default=42,
+    )
 
     args = parser.parse_args()
 
@@ -274,7 +250,7 @@ if __name__ == "__main__":
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
 
     total_steps = training_loop(
-        args.env_name, args.demos, args.prune, config, agent=args.agent
+        args.env_name, args.demos, args.prune, config, agent=args.agent, seed=args.seed
     )
 
     # if args.graph:

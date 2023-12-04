@@ -3,3 +3,11 @@ total_steps: 100000
 sac: { learning_starts: 10000, use_sde: false }
 
 td3: { learning_starts: 10000 }
+
+prune_config:
+  {
+    agglomerative_clustering_kwargs:
+      { metric: "l2", linkage: "average", distance_threshold: 2 },
+    filtering_kwargs:
+      { size_treshold: 5, measure_cutoff: 80, method: "entropy" },
+  }

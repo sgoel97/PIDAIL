@@ -8,24 +8,6 @@ from sklearn.cluster import AgglomerativeClustering
 from infrastructure.Transition import Transition
 from infrastructure.Trajectory import Trajectory
 
-from imitation.data.types import TrajectoryWithRew
-
-
-def create_imitation_trajectories(expert_file_path):
-    with open(expert_file_path, "rb") as f:
-        demos = pickle.load(f)
-    rollouts = []
-    for demo in demos:
-        trajectory = TrajectoryWithRew(
-            obs=demo["observation"],
-            acts=demo["action"][:-1],
-            infos=None,
-            terminal=True,
-            rews=demo["reward"][:-1],
-        )
-        rollouts.append(trajectory)
-    return rollouts
-
 
 def create_trajectories(expert_file_path):
     """
