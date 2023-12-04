@@ -12,6 +12,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.ppo import MlpPolicy
 
 import tempfile
 from imitation.algorithms import bc
@@ -20,6 +21,10 @@ from imitation.data import rollout
 from imitation.util.util import make_vec_env
 from imitation.data.wrappers import RolloutInfoWrapper
 from imitation.algorithms.dagger import SimpleDAggerTrainer
+from imitation.algorithms import sqil
+from imitation.algorithms.adversarial.gail import GAIL
+from imitation.rewards.reward_nets import BasicRewardNet
+from imitation.util.networks import RunningNorm
 
 from infrastructure.misc_utils import *
 from infrastructure.state_utils import *
@@ -27,22 +32,14 @@ from infrastructure.plotting_utils import *
 from infrastructure.scripting_utils import *
 from infrastructure.agent_utils import *
 
-discrete_agents = ["dqn"]
-continous_agents = ["sac", "td3"]
+discrete_agents = ["dqn", "sqil", "dagger", "bc"]
+continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
 
 
 def training_loop(env_name, using_demos, prune, config, agent=None):
     # Set up environment, hyperparameters, and data storage
     total_steps = config["total_steps"]
     gym_env_name = get_env(env_name)
-
-    # Set up defaults
-    agent_name = "dqn" if agent is None else agent
-
-    # Set up logging
-    timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
-    log_dir = f"{os.getcwd()}/logs/{env_name}/{agent_name}_{timestamp}"
-    logger = configure(log_dir, ["tensorboard"])
 
     # Set up environment
     rng = np.random.default_rng(0)
@@ -60,12 +57,15 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
         post_wrappers=[lambda env, _: RolloutInfoWrapper(env)],
     )
 
-    # Set up agents
+    # Set up defaults
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
     agent_name = get_default_agent(agent, discrete)
     check_agent_env(agent_name, discrete, discrete_agents, continous_agents)
-    agent = get_agent(agent_name, env, config)
-    agent.set_logger(logger)
+
+    # Set up logging
+    timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
+    log_dir = f"{os.getcwd()}/logs/{env_name}/{agent_name}_{timestamp}"
+    logger = configure(log_dir, ["tensorboard"])
 
     # Set up period evaluation
     eval_callback = EvalCallback(
@@ -77,34 +77,96 @@ def training_loop(env_name, using_demos, prune, config, agent=None):
         render=False,
     )
 
-    # Train Dagger
     if using_demos:
-        expert = load_policy(
-            "ppo-huggingface",
-            organization="HumanCompatibleAI",
-            env_name=gym_env_name,
-            venv=env,
-        )
+        expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
+        rollouts = create_imitation_trajectories(expert_file_path)
+        transitions = rollout.flatten_trajectories(rollouts)
 
-        bc_trainer = bc.BC(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
-            rng=rng,
-        )
-
-        with tempfile.TemporaryDirectory(prefix="dagger_example_") as tmpdir:
-            print(tmpdir)
-            dagger_trainer = SimpleDAggerTrainer(
-                venv=env,
-                scratch_dir=tmpdir,
-                expert_policy=expert,
-                bc_trainer=bc_trainer,
+        # BC
+        if agent_name == "bc":
+            bc_trainer = bc.BC(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                demonstrations=transitions,
                 rng=rng,
             )
-            dagger_trainer.train(total_steps, bc_train_kwargs={"progress_bar": True})
 
-        agent = dagger_trainer.policy
+            bc_trainer.train(n_epochs=total_steps // 1000, progress_bar=True)
+            agent = bc_trainer.policy
+
+        # Dagger
+        if agent_name == "dagger":
+            expert = load_policy(
+                "ppo-huggingface",
+                organization="HumanCompatibleAI",
+                env_name=gym_env_name,
+                venv=env,
+            )
+
+            bc_trainer = bc.BC(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                rng=rng,
+            )
+
+            with tempfile.TemporaryDirectory(prefix="dagger_example_") as tmpdir:
+                print(tmpdir)
+                dagger_trainer = SimpleDAggerTrainer(
+                    venv=env,
+                    scratch_dir=tmpdir,
+                    expert_policy=expert,
+                    bc_trainer=bc_trainer,
+                    rng=rng,
+                )
+                dagger_trainer.train(
+                    total_steps, bc_train_kwargs={"progress_bar": True}
+                )
+
+            agent = dagger_trainer.policy
+
+        # Soft Q learning
+        if agent_name == "sqil":
+            sqil_trainer = sqil.SQIL(
+                venv=env,
+                demonstrations=rollouts,
+                policy="MlpPolicy",
+            )
+            sqil_trainer.train(total_timesteps=10000, progress_bar=True)
+            agent = sqil_trainer.policy
+
+        # GAIL
+        if agent_name == "gail":
+            learner = PPO(
+                env=env,
+                policy=MlpPolicy,
+                batch_size=64,
+                ent_coef=0.0,
+                learning_rate=0.0004,
+                gamma=0.95,
+                n_epochs=5,
+                seed=42,
+            )
+            reward_net = BasicRewardNet(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                normalize_input_layer=RunningNorm,
+            )
+            gail_trainer = GAIL(
+                demonstrations=rollouts,
+                demo_batch_size=256,
+                gen_replay_buffer_capacity=512,
+                n_disc_updates_per_round=8,
+                venv=env,
+                gen_algo=learner,
+                reward_net=reward_net,
+                allow_variable_horizon=True,
+            )
+            gail_trainer.train(total_timesteps=total_steps)
+            agent = gail_trainer.policy
+
     else:
+        agent = get_agent(agent_name, env, config)
+        agent.set_logger(logger)
         agent.learn(total_steps, callback=eval_callback, progress_bar=True)
 
     # Set up replay buffer
