@@ -7,7 +7,9 @@ sys.path.append(os.getcwd() + "/cs285/")
 import gymnasium as gym
 from datetime import datetime
 
-from stable_baselines3 import PPO
+from huggingface_sb3 import load_from_hub
+
+from stable_baselines3 import PPO, DQN
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import EvalCallback
@@ -111,12 +113,15 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
 
         # Dagger
         if agent_name == "dagger":
-            expert = load_policy(
-                "ppo-huggingface",
-                organization="HumanCompatibleAI",
-                env_name=gym_env_name,
-                venv=env,
-            )
+            try:
+                expert = load_policy(
+                    "ppo-huggingface",
+                    organization="HumanCompatibleAI",
+                    env_name=gym_env_name,
+                    venv=env,
+                )
+            except:
+                expert = PPO.load(load_from_hub(repo_id=f"sb3/ppo-{gym_env_name}", filename=f"ppo-{gym_env_name}.zip",))
 
             bc_trainer = bc.BC(
                 observation_space=env.observation_space,
@@ -146,7 +151,7 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 demonstrations=rollouts,
                 policy="MlpPolicy",
             )
-            sqil_trainer.train(total_timesteps=10000, progress_bar=True)
+            sqil_trainer.train(total_timesteps=total_steps, progress_bar=True)
             agent = sqil_trainer.policy
 
         # GAIL

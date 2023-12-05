@@ -28,33 +28,31 @@ demos = []
 
 eval_env = gym.make(ENV_NAME)
 mean_reward, std_reward = evaluate_policy(
-    expert, eval_env, render=True, n_eval_episodes=10, deterministic=True, warn=False
+    expert, eval_env, render=False, n_eval_episodes=10, deterministic=True, warn=False
 )
 print(f"mean_reward={mean_reward} +/- {std_reward}")
 
 for traj in range(3): # changeable
     observations = []
     actions = []
-    next_observations = []
     rewards = []
-    dones = []
 
     obs, _ = env.reset()
+    # observations.append(obs)
     for i in tqdm(range(1000)): # changeable
         action, _states = expert.predict(obs, deterministic=True)
         next_obs, reward, done, info, _ = env.step(action)
         observations.append(obs)
         actions.append(action)
-        next_observations.append(next_obs)
         rewards.append(reward)
-        dones.append(done)
         if done:
             break
         else:
             obs = next_obs
         # TODO store these into pickle/parquet files
 
-    demo = {"observation": observations, "action": actions, "reward":rewards}
+    print(len(observations), len(actions), len(rewards))
+    demo = {"observation": np.array(observations), "action": np.array(actions), "reward":np.array(rewards)}
     demos.append(demo)
 
 with open(f"{os.getcwd()}/cs285/experts/expert_data_{ENV_NAME}.pkl", "wb") as f:
