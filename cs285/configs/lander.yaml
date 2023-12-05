@@ -1,0 +1,11 @@
+total_steps: 10000
+
+dqn: { learning_starts: 10000 }
+
+prune_config:
+  {
+    agglomerative_clustering_kwargs:
+      { metric: "l2", linkage: "average", distance_threshold: 0.2 },
+    filtering_kwargs:
+      { size_treshold: 10, measure_cutoff: 80, method: "variance" },
+  }

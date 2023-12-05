@@ -1,4 +1,4 @@
-total_steps: 100000
+total_steps: 10000
 
 dqn:
   {
@@ -13,4 +13,12 @@ dqn:
     policy_kwargs: { net_arch: [256, 256] },
     target_update_interval: 10,
     train_freq: 256,
+  }
+
+prune_config:
+  {
+    agglomerative_clustering_kwargs:
+      { metric: "l2", linkage: "average", distance_threshold: 0.2 },
+    filtering_kwargs:
+      { size_treshold: 10, measure_cutoff: 80, method: "variance" },
   }
