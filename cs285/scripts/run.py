@@ -84,8 +84,6 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
         rollouts = create_imitation_trajectories(expert_file_path)
         transitions = rollout.flatten_trajectories_with_rew(rollouts)
 
-        # print(transitions, type(transitions), transitions.obs)
-
         if prune:
             prune_config = config["prune_config"]
 
@@ -121,7 +119,12 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                     venv=env,
                 )
             except:
-                expert = PPO.load(load_from_hub(repo_id=f"sb3/ppo-{gym_env_name}", filename=f"ppo-{gym_env_name}.zip",))
+                expert = PPO.load(
+                    load_from_hub(
+                        repo_id=f"sb3/ppo-{gym_env_name}",
+                        filename=f"ppo-{gym_env_name}.zip",
+                    )
+                )
 
             bc_trainer = bc.BC(
                 observation_space=env.observation_space,

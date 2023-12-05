@@ -4,21 +4,31 @@
 
 ## TODO:
 
-- [jonathan] rework expert data gathering using datasets from sota model githubs
 - [alina] implement/copy one of [dqfd, dapg] algorithms from github
-- [samarth] rework code to use packages
-  - stable baselines 3
-  - DL-Engine
+
+- [alina] Fix filtering logic (currently eliminates groups, should prune groups)
+
+- [samarth] set up logging to compare pruning vs no pruning
+
+- [samarth] set up consistent randomness
+
+- [samarth] Fix filtering logic (currently eliminates groups, should prune groups)
+
+- [Jonathan] alter expert data generation to create good but not great (suboptimal) demos
+
+  - re-initialize expert weights somehow for each trajectory
+
+- [Jonathan] start on the math for the paper
+
+  - From Sergei: must formalize π\*(a|s) somehow; aka formalize the assumption we're making about the expert
 
 Next Steps:
 
-1. test to see if we can get baselines working (no pruning)
-2. [done] plug in pruning and see the changes
-3. ablation studies on pruning types
+1. ablation studies on pruning types
    - entropy, variance, etc...
    - l2 vs cos distance, etc...
    - expert optimality (beta?)
-4. [extra] ablation studies on pruning hyperparameters
+2. [extra] ablation studies on pruning hyperparameters
 
 ## Relevant Resources
 
@@ -27,12 +37,6 @@ Next Steps:
   - [Stable-Baselines3](https://stable-baselines3.readthedocs.io/en/master/): Contains standard algorithms and ways to evaluate models
 
   - [RL Baselines3 Zoo](https://github.com/DLR-RM/rl-baselines3-zoo): Contains pretrained agents and optimized hyperparams for models
-
-- **Specialized Libraries to Use:**
-
-  - [DL Engine](https://github.com/opendilab/DI-engine): Has many, many algorithms and a ton of environments to choose from
-
-  - [RL for MuJoCo](https://github.com/aravindr93/mjrl): Has DAPG implementation
 
 - **Papers and Algos to Look at:**
 
