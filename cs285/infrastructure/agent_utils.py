@@ -1,8 +1,9 @@
 import constants
 import numpy as np
-
+from agents.dqfd import DQfDAgent
 from stable_baselines3 import DQN, SAC, TD3
 from stable_baselines3.common.noise import NormalActionNoise
+import gymnasium as gym
 
 
 def get_default_agent(agent, discrete, default_discrete="dqn", default_continous="sac"):
@@ -22,6 +23,10 @@ def get_agent(agent, env, config):
     elif agent == "sac":
         # https://stable-baselines3.readthedocs.io/en/master/modules/sac.html
         agent = SAC("MlpPolicy", env, **config["sac"], **global_config)
+    elif agent == "dqfd":
+        # https://github.com/LilTwo/DRL-using-PyTorch/tree/master
+        assert isinstance(env.action_space, gym.spaces.Discrete), "DQfD only works with discrete action spaces"
+        agent = DQfDAgent(env)
     else:
         n_actions = env.action_space.shape[-1]
         action_noise = NormalActionNoise(

@@ -18,7 +18,7 @@ from infrastructure.plotting_utils import *
 from infrastructure.scripting_utils import *
 from infrastructure.agent_utils import *
 
-discrete_agents = ["dqn"]
+discrete_agents = ["dqn", "dqfd"]
 continous_agents = ["sac", "td3"]
 
 

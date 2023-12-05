@@ -13,8 +13,8 @@ from functools import reduce
 
 class DQfDAgent:
     def __init__(self,
-                 obs_shape,
-                 num_actions,
+                 env,
+                 pretrain_steps = 1000,
                  start_epsilon = 0.9,
                  end_epsilon = 0.05,
                  epsilon_decay = 1000,
@@ -27,8 +27,9 @@ class DQfDAgent:
                  lambda_l2 = 1e-5,
                  n_step = 3):
         # Common variables
-        self.obs_shape = obs_shape
-        self.num_actions = num_actions
+        self.env = env
+        self.obs_shape = env.observation_space.shape[0]
+        self.num_actions = env.action_space.n
         self.gamma = gamma
         self.start_epsilon = start_epsilon
         self.end_epsilon = end_epsilon
@@ -178,3 +179,13 @@ class DQfDAgent:
             self.target_net.load_state_dict(self.q_net.state_dict())
         else:
             self.total_steps += 1
+
+    def set_logger(self, logger):
+        print("DQFD logger not yet set!!!")
+    
+    def learn(self, total_timesteps = 10000, callback = None, progress_bar = False):
+        obs = self.env.reset()
+        total_reward = 0
+        success_count = 0
+        start = 0
+        
