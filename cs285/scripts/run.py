@@ -40,7 +40,9 @@ discrete_agents = ["dqn", "sqil", "dagger", "bc"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
 
 
-def training_loop(env_name, using_demos, prune, config, agent, seed):
+def training_loop(
+    env_name, using_demos, prune, config, agent, seed, init_weight_file=None
+):
     # Set up environment, hyperparameters, and data storage
     total_steps = config["total_steps"]
     gym_env_name = get_env(env_name)
@@ -99,7 +101,8 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
             print("Before Filtering:\n############################")
             print_group_stats(groups)
 
-            filtered_groups = filter_transition_groups(groups, prune_config)
+            # filtered_groups = filter_transition_groups(groups, prune_config)
+            filtered_groups = prune_transition_groups(groups, prune_config)
             print("\nAfter Filtering:\n############################")
             print_group_stats(filtered_groups)
 
@@ -114,6 +117,13 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 rng=rng,
                 custom_logger=imitation_logger,
             )
+
+            if init_weight_file is not None:
+                bc_trainer.policy.load_state_dict(torch.load(init_weight_file))
+            else:
+                torch.save(
+                    bc_trainer.policy.state_dict(), Path(log_dir) / "init_weights.pth"
+                )
 
             bc_trainer.train(
                 n_epochs=total_steps // 1000,

@@ -34,8 +34,16 @@ if __name__ == "__main__":
         args.env_name, using_demos=True, prune=False, config=config, agent="bc", seed=42
     )
 
+    unpruned_init_weight_file = Path(unpruned_log_dir) / "init_weights.pth"
+
     total_steps, pruned_log_dir = training_loop(
-        args.env_name, using_demos=True, prune=True, config=config, agent="bc", seed=42
+        args.env_name,
+        using_demos=True,
+        prune=True,
+        config=config,
+        agent="bc",
+        seed=42,
+        init_weight_file=unpruned_init_weight_file,
     )
 
     rollout_stats = [

@@ -1,4 +1,5 @@
 total_steps: 10000
+discrete: True
 
 dqn: { learning_starts: 10000 }
 

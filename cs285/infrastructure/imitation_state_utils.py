@@ -7,6 +7,11 @@ from sklearn.cluster import AgglomerativeClustering
 
 from imitation.data.types import TrajectoryWithRew, TransitionsWithRew
 
+from infrastructure.imitation_prune_utils import (
+    prune_group_mode_action,
+    prune_group_vector_action,
+)
+
 
 def create_imitation_trajectories(expert_file_path):
     with open(expert_file_path, "rb") as f:
@@ -62,7 +67,7 @@ def get_transition_group_variance(transition_group):
         variance of the actions taken
     """
     actions = [t["acts"] for t in transition_group]
-    return np.var(actions)
+    return np.mean(np.var(actions, axis=-1))
 
 
 def get_transition_group_entropy(transition_group):
@@ -91,6 +96,30 @@ def get_group_measures(transition_groups, method="variance"):
 
     measures = [measure_func(g) for g in transition_groups]
     return measures
+
+
+def prune_transition_groups(transition_groups, prune_config):
+    size_treshold, measure_cutoff, method = prune_config["filtering_kwargs"].values()
+
+    measures = get_group_measures(transition_groups, method=method)
+    measure_threshold = np.percentile(measures, measure_cutoff)
+
+    measure_mask = np.array(measures) > measure_threshold
+
+    group_sizes = np.array(list(map(len, transition_groups)))
+    group_size_mask = group_sizes > size_treshold
+
+    valid_transition_groups = []
+    for i in range(len(transition_groups)):
+        g = transition_groups[i]
+        if measure_mask[i] and group_size_mask[i]:
+            if len(g[0]["acts"]) == 1:
+                g = prune_group_mode_action(g)
+            else:
+                g = prune_group_vector_action(g)
+        valid_transition_groups.append(g)
+
+    return valid_transition_groups
 
 
 def filter_transition_groups(transition_groups, prune_config):
