@@ -27,6 +27,8 @@ from imitation.algorithms import sqil
 from imitation.algorithms.adversarial.gail import GAIL
 from imitation.rewards.reward_nets import BasicRewardNet
 from imitation.util.networks import RunningNorm
+from imitation.util.logger import HierarchicalLogger
+from imitation.policies.base import FeedForward32Policy
 
 from infrastructure.misc_utils import *
 from infrastructure.imitation_state_utils import *
@@ -44,7 +46,8 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
     gym_env_name = get_env(env_name)
 
     # Set up environment
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed=seed)
+
     # env = Monitor(gym.make(gym_env_name), filename=log_dir + "/train")
     # eval_env = Monitor(gym.make(gym_env_name), filename=log_dir + "/eval")
 
@@ -66,8 +69,10 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
 
     # Set up logging
     timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
-    log_dir = f"{os.getcwd()}/logs/{env_name}/{agent_name}_{timestamp}"
+    ext = "_pruned" if prune else ""
+    log_dir = f"{os.getcwd()}/logs/{env_name}/{agent_name}{ext}_{timestamp}"
     logger = configure(log_dir, ["tensorboard"])
+    imitation_logger = HierarchicalLogger(logger)
 
     # Set up period evaluation
     eval_callback = EvalCallback(
@@ -78,6 +83,9 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
         verbose=0,
         render=False,
     )
+
+    eval_returns = []
+    eval_returns_stds = []
 
     if using_demos:
         expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
@@ -104,9 +112,14 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 action_space=env.action_space,
                 demonstrations=transitions,
                 rng=rng,
+                custom_logger=imitation_logger,
             )
 
-            bc_trainer.train(n_epochs=total_steps // 1000, progress_bar=True)
+            bc_trainer.train(
+                n_epochs=total_steps // 1000,
+                log_rollouts_venv=eval_env,
+                progress_bar=True,
+            )
             agent = bc_trainer.policy
 
         # Dagger
@@ -130,6 +143,7 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 observation_space=env.observation_space,
                 action_space=env.action_space,
                 rng=rng,
+                custom_logger=imitation_logger,
             )
 
             with tempfile.TemporaryDirectory(prefix="dagger_example_") as tmpdir:
@@ -153,6 +167,8 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 venv=env,
                 demonstrations=rollouts,
                 policy="MlpPolicy",
+                rng=rng,
+                custom_logger=imitation_logger,
             )
             sqil_trainer.train(total_timesteps=total_steps, progress_bar=True)
             agent = sqil_trainer.policy
@@ -183,8 +199,11 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 gen_algo=learner,
                 reward_net=reward_net,
                 allow_variable_horizon=True,
+                custom_logger=imitation_logger,
             )
-            gail_trainer.train(total_timesteps=total_steps)
+            gail_trainer.train(
+                total_timesteps=total_steps,
+            )
             agent = gail_trainer.policy
 
     else:
@@ -194,16 +213,16 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
 
     # Evaluate at end
     avg_eval_return, std_eval_return = evaluate_policy(
-        agent, eval_env, n_eval_episodes=10
+        agent, eval_env, n_eval_episodes=10, deterministic=True
     )
-
+    print(eval_returns)
     print("avg. eval return:", avg_eval_return)
     print("std. eval return:", std_eval_return)
 
     env.close()
     eval_env.close()
 
-    return total_steps
+    return total_steps, imitation_logger.get_dir()
 
 
 if __name__ == "__main__":
@@ -257,9 +276,25 @@ if __name__ == "__main__":
 
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
 
-    total_steps = training_loop(
+    total_steps, log_dir = training_loop(
         args.env_name, args.demos, args.prune, config, agent=args.agent, seed=args.seed
     )
 
-    # if args.graph:
-    #     plot_results(total_steps, results.values(), results.keys(), data_path)
+    rollout_stats = [
+        "rollout/return_max",
+        "rollout/return_mean",
+        "rollout/return_min",
+        "rollout/return_std",
+    ]
+    stats = parse_tensorboard(
+        log_dir,
+        rollout_stats,
+    )
+
+    if args.graph:
+        plot_results(
+            total_steps,
+            list(map(lambda x: x.value, stats.values())),
+            list(stats.keys()),
+            log_dir,
+        )
