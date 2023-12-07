@@ -22,6 +22,12 @@ checkpoint = load_from_hub(
 )
 expert = PPO.load(checkpoint)
 
+checkpoint = load_from_hub(
+    repo_id=f"sb3/dqn-{ENV_NAME}",
+    filename=f"dqn-{ENV_NAME}.zip",
+)
+expert2 = DQN.load(checkpoint)
+
 env = gym.make(ENV_NAME)
 
 demos = []
@@ -31,29 +37,35 @@ mean_reward, std_reward = evaluate_policy(
     expert, eval_env, render=False, n_eval_episodes=10, deterministic=True, warn=False
 )
 print(f"mean_reward={mean_reward} +/- {std_reward}")
+mean_reward, std_reward = evaluate_policy(
+    expert2, eval_env, render=False, n_eval_episodes=10, deterministic=True, warn=False
+)
+print(f"mean_reward={mean_reward} +/- {std_reward}")
 
-for traj in range(3): # changeable
+num_transitions = 0
+while num_transitions < 10000: # changeable
     observations = []
     actions = []
     rewards = []
 
-    obs, _ = env.reset()
-    # observations.append(obs)
-    for i in tqdm(range(1000)): # changeable
-        action, _states = expert.predict(obs, deterministic=True)
-        next_obs, reward, done, info, _ = env.step(action)
-        observations.append(obs)
-        actions.append(action)
-        rewards.append(reward)
-        if done:
-            break
-        else:
-            obs = next_obs
-        # TODO store these into pickle/parquet files
+    for exp in [expert, expert2]:
+        obs, _ = env.reset()
+        for i in tqdm(range(1000)): # changeable
+            action, _states = exp.predict(obs, deterministic=True)
+            next_obs, reward, done, info, _ = env.step(action)
+            observations.append(obs)
+            actions.append(action)
+            rewards.append(reward)
+            num_transitions += 1
+            if done:
+                break
+            else:
+                obs = next_obs
 
-    print(len(observations), len(actions), len(rewards))
+    # print(len(observations), len(actions), len(rewards))
     demo = {"observation": np.array(observations), "action": np.array(actions), "reward":np.array(rewards)}
     demos.append(demo)
 
 with open(f"{os.getcwd()}/cs285/experts/expert_data_{ENV_NAME}.pkl", "wb") as f:
     pickle.dump(demos, f)
+    print(f"saved expert data to {os.getcwd()}/cs285/experts/expert_data_{ENV_NAME}.pkl")
