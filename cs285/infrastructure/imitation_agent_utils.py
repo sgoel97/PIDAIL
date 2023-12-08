@@ -27,7 +27,6 @@ def get_agent(agent, env, config):
         agent = SAC("MlpPolicy", env, **config["sac"], **global_config)
     elif agent == "dqfd":
         # https://github.com/LilTwo/DRL-using-PyTorch/tree/master
-        assert isinstance(env.action_space, gym.spaces.Discrete), "DQfD only works with discrete action spaces"
         agent = DQfDAgent(env)
     else:
         n_actions = env.action_space.shape[-1]

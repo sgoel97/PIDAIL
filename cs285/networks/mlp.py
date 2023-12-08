@@ -19,6 +19,10 @@ class MLP(nn.Module):
         )
 
     def forward(self, obs):
+        if type(obs) == list:
+            obs = torch.stack(obs)
+        if type(obs) != torch.Tensor:
+            obs = torch.Tensor(obs)
         q_values = self.model(obs)
         return q_values
     

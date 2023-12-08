@@ -1,4 +1,3 @@
-import sys
 import torch
 from torch import nn, optim
 import numpy as np
@@ -9,12 +8,27 @@ from infrastructure.misc_utils import *
 from collections import defaultdict
 import math
 from functools import reduce
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+import os
+
+
+class WeightedMSE(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, inputs, targets, weights):
+        l = torch.tensor(0.0)
+        for input, target, weight in zip(inputs, targets, weights):
+            error = input - target
+            l += error ** 2 * weight
+        return l / weights.shape[0]
 
 
 class DQfDAgent:
     def __init__(self,
                  env,
-                 pretrain_steps = 1000,
+                 pretrain_steps = 10000,
                  start_epsilon = 0.9,
                  end_epsilon = 0.05,
                  epsilon_decay = 1000,
@@ -36,6 +50,7 @@ class DQfDAgent:
         self.epsilon_decay = epsilon_decay
         
         # Pretraining stuff
+        self.pretrain_steps = pretrain_steps
         self.lambda_nstep = lambda_nstep
         self.lambda_sv = lambda_sv
         self.lambda_l2 = lambda_l2
@@ -49,10 +64,10 @@ class DQfDAgent:
         self.tau = tau
         self.hidden_dim = 64
         self.total_steps = 0
-        self.q_net = MLP(obs_shape, [self.hidden_dim] * 2, num_actions).to(DEVICE)
-        self.target_net = MLP(obs_shape, [self.hidden_dim] * 2, num_actions).to(DEVICE)
-        self.q_optimizer = optim.AdamW(self.q_net.parametrs())
-        self.q_loss_fn = nn.MSELoss()
+        self.q_net = MLP(self.obs_shape, [self.hidden_dim] * 2, self.num_actions).to(DEVICE)
+        self.target_net = MLP(self.obs_shape, [self.hidden_dim] * 2, self.num_actions).to(DEVICE)
+        self.q_optimizer = optim.AdamW(self.q_net.parameters())
+        self.q_loss_fn = WeightedMSE()
         self.lr_schedule = optim.lr_scheduler.ConstantLR(self.q_optimizer, factor = 1.0)
     
     def sample_from_replay(self):
@@ -75,35 +90,44 @@ class DQfDAgent:
             next_obs = from_numpy(next_obs)
         self.prb.insert(obs, action, reward, next_obs, done, None)
     
-    def get_action(self, obs):
+    def get_action(self, obs, greedy = True):
         if type(obs) != torch.Tensor:
             obs = from_numpy(obs)
-        prob = np.random.random()
-        eps = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * np.exp(
-            -1.0 * self.total_steps / self.epsilon_decay
-        )
-        if prob > eps:
+        if greedy:
+            prob = np.random.random()
+            eps = self.end_epsilon + (self.start_epsilon - self.end_epsilon) * np.exp(
+                -1.0 * self.total_steps / self.epsilon_decay
+            )
+            if prob > eps:
+                with torch.no_grad():
+                    q_values = self.q_net(obs)
+                    action = q_values.argmax().unsqueeze(0)
+            else:
+                action = torch.Tensor([np.random.choice(range(self.num_actions))])
+        else:
             with torch.no_grad():
                 q_values = self.q_net(obs)
                 action = q_values.argmax().unsqueeze(0)
-        else:
-            action = torch.Tensor([np.random.choice(range(self.num_actions))])
         return to_numpy(action).squeeze(0).item()
     
     def calc_TD(self, samples):
         obs = samples["observations"]
         actions = samples["actions"]
+        if type(actions) != torch.Tensor:
+            actions = torch.tensor(actions, dtype = torch.int64)
         rewards = samples["rewards"]
         next_obs = samples["next_observations"]
         dones = samples["dones"]
 
         next_q_values = self.q_net(next_obs)
         best_actions = next_q_values.argmax(dim = 1)
-        target_q_values = torch.gather(self.target_net(next_obs), 1, best_actions)
+        target_net_q_values = self.target_net(next_obs)
+        target_q_values = torch.gather(target_net_q_values, 1, best_actions.unsqueeze(1)).squeeze(1)
         
         q_target = torch.Tensor(rewards)
         q_target[torch.Tensor(dones) != 1] += self.gamma * target_q_values[torch.Tensor(dones) != 1]
-        q_predict = torch.gather(self.q_net(obs), 1, actions)
+        q_net_q_values = self.q_net(obs)
+        q_predict = torch.gather(q_net_q_values, 1, actions.unsqueeze(1)).squeeze(1)
         return q_predict, q_target
     
     def calc_JE(self, samples):
@@ -111,7 +135,7 @@ class DQfDAgent:
         actions = samples["actions"]
         demo_infos = samples["demo_infos"]
 
-        loss = torch.Tensor(0.0)
+        loss = torch.tensor(0.0)
         num_demos = 0
         for i in range(len(obs)):
             if demo_infos[i] is None:
@@ -119,10 +143,10 @@ class DQfDAgent:
             best_actions_desc = torch.argsort(self.q_net(obs[i]), descending = True)
             if len(best_actions_desc) == 1:
                 continue
-            q_expert = torch.gather(self.q_net(obs[i]), 1, actions[i].unsqueeze(1)).squeeze(1)
+            q_expert = self.q_net(obs[i])[actions[i]]
             best_act, second_best_act = best_actions_desc[0], best_actions_desc[1]
             max_action = second_best_act if best_act == actions[i] else best_act
-            q_value = torch.gather(self.q_net(obs[i]), 1, max_action)
+            q_value = self.q_net(obs[i])[max_action]
             if q_value + self.margin < q_expert:
                 continue
             else:
@@ -135,7 +159,7 @@ class DQfDAgent:
         next_obs = samples["next_observations"]
         demo_infos = samples["demo_infos"]
 
-        loss = torch.Tensor(0.0)
+        loss = torch.tensor(0.0)
         num_demos = 0
         for i in range(len(obs)):
             if demo_infos[i] is None:
@@ -180,12 +204,59 @@ class DQfDAgent:
         else:
             self.total_steps += 1
 
-    def set_logger(self, logger):
-        print("DQFD logger not yet set!!!")
+    def set_log_dir(self, log_dir):
+        if not os.path.exists(log_dir + "/"):
+            os.makedirs(log_dir + "/")
+        self.log_dir = log_dir + "/"
     
-    def learn(self, total_timesteps = 10000, callback = None, progress_bar = False):
-        obs = self.env.reset()
-        total_reward = 0
-        success_count = 0
+    def learn(self, total_steps, transitions, progress_bar = False):
+        assert total_steps >= 2 * self.pretrain_steps, f"Total train steps must be at least twice pretrain steps ({self.pretrain_steps})"
+        pretrain_and_train_rewards = []
+        # Store demo transitions
         start = 0
-        
+        for i in range(len(transitions)):
+            start += 1
+            t = transitions[i]
+            self.insert_demo_transition(t["obs"], t["acts"], t["rews"], t["next_obs"], t["dones"], i)
+        self.prb.sum_tree.start = start
+        # Pretrain on demos
+        pretrain_range = range(self.pretrain_steps)
+        if progress_bar:
+            pretrain_range = tqdm(pretrain_range)
+        for i in pretrain_range:
+            self.update()
+            pretrain_and_train_rewards.append(0)
+        # Train DQN
+        obs, _ = self.env.reset()
+        train_range = range(total_steps - self.pretrain_steps)
+        if progress_bar:
+            train_range = tqdm(train_range)
+        for i in train_range:
+            action = int(self.get_action(obs))
+            next_obs, reward, done, truncated, _ = self.env.step(action)
+            pretrain_and_train_rewards.append(reward)
+            self.insert_own_transition(obs, action, reward, next_obs, done and not truncated)
+            self.update()
+            if done:
+                obs, _ = self.env.reset()
+            else:
+                obs = next_obs
+        # Save training rewards
+        plt.plot(range(len(pretrain_and_train_rewards)), pretrain_and_train_rewards)
+        plt.title("Pretraining/Training Returns")
+        plt.savefig(self.log_dir + "train_returns.png")
+    
+    def evaluate(self, n_eval_episodes = 10):
+        obs, _ = self.env.reset()
+        eval_returns = []
+        for _ in range(n_eval_episodes):
+            total_returns = 0
+            done = False
+            while not done:
+                action = int(self.get_action(obs, greedy = False))
+                next_obs, reward, done, _, _ = self.env.step(action)
+                total_returns += reward
+                obs = next_obs
+            obs, _ = self.env.reset()
+            eval_returns.append(total_returns)
+        return np.mean(eval_returns), np.std(eval_returns)

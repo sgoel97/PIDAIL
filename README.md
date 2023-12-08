@@ -20,7 +20,7 @@
 
 - [Jonathan] start on the math for the paper
 
-  - From Sergei: must formalize π\*(a|s) somehow; aka formalize the assumption we're making about the expert
+  - From Sergey: must formalize π\*(a|s) somehow; aka formalize the assumption we're making about the expert
 
 Next Steps:
 

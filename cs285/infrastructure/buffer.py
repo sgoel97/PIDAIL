@@ -70,7 +70,7 @@ class PrioritizedReplayBuffer:  # FIXME: could make it extend from ReplayBuffer 
     def get_priority(self, error):
         return (error + self.e) ** self.a
     
-    def insert(self, obs, action, reward, next_obs, done, error = None):
+    def insert(self, obs, action, reward, next_obs, done, demo_info, error = None):
         if error is None:
             priority = self.sum_tree.tree[0]
             if priority == 0:
@@ -79,7 +79,7 @@ class PrioritizedReplayBuffer:  # FIXME: could make it extend from ReplayBuffer 
                 priority = self.sum_tree.get(priority * 0.9)[1]
         else:
             priority = self.get_priority(error)
-        self.sum_tree.insert(priority, obs, action, reward, next_obs, done)
+        self.sum_tree.insert(priority, obs, action, reward, next_obs, done, demo_info)
     
     def sample(self, amount):
         sample = {"observations": [], "actions": [], "rewards": [], "next_observations": [], "dones": [], "demo_infos": []}

@@ -36,6 +36,8 @@ from infrastructure.plotting_utils import *
 from infrastructure.scripting_utils import *
 from infrastructure.imitation_agent_utils import *
 
+from agents.dqfd import DQfDAgent
+
 discrete_agents = ["dqn", "sqil", "dagger", "bc", "dqfd"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
 
@@ -205,17 +207,28 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 total_timesteps=total_steps,
             )
             agent = gail_trainer.policy
+        
+        if agent_name == "dqfd":
+            agent = DQfDAgent(gym.make(gym_env_name))
+            agent.set_log_dir(log_dir)
+            agent.learn(total_steps, transitions, progress_bar=True)
 
     else:
         agent = get_agent(agent_name, env, config)
-        agent.set_logger(logger)
-        agent.learn(total_steps, callback=eval_callback, progress_bar=True)
+        if isinstance(agent, DQfDAgent):
+            agent.set_log_dir(log_dir)
+            agent.learn(total_steps, transitions, progress_bar=True)
+        else:
+            agent.set_logger(logger)
+            agent.learn(total_steps, callback=eval_callback, progress_bar=True)
 
     # Evaluate at end
-    avg_eval_return, std_eval_return = evaluate_policy(
-        agent, eval_env, n_eval_episodes=10, deterministic=True
-    )
-    print(eval_returns)
+    if isinstance(agent, DQfDAgent):
+        avg_eval_return, std_eval_return = agent.evaluate()
+    else:
+        avg_eval_return, std_eval_return = evaluate_policy(
+            agent, eval_env, n_eval_episodes=10, deterministic=True
+        )
     print("avg. eval return:", avg_eval_return)
     print("std. eval return:", std_eval_return)
 
