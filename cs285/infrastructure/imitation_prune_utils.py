@@ -3,6 +3,9 @@ from scipy import stats
 
 
 def prune_group_mode_action(group):
+    """
+    Only keeps states within a group that take the mode action within a group
+    """
     actions = [g["acts"] for g in group]
     majority_action = stats.mode(actions, keepdims=False).mode
     pruned_group = [g for g in group if g["acts"] == majority_action]
@@ -10,6 +13,10 @@ def prune_group_mode_action(group):
 
 
 def prune_group_vector_action(group, percentile=50):
+    """
+    Creates a mean vector which averages each feature of the action vector,
+    then keeps action vectors that are within a percentile of the mean action vector
+    """
     actions = [g["acts"] for g in group]
     mean_action = np.mean(actions, axis=0, keepdims=True)
 

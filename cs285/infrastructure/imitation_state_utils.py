@@ -148,6 +148,9 @@ def filter_transition_groups(transition_groups, prune_config):
 
 
 def collate_transitions(transition_groups):
+    """
+    Transform list of transition groups into one batched TransitionsWithRew object
+    """
     transitions = []
     for group in transition_groups:
         transitions.extend(group)
@@ -167,6 +170,9 @@ def collate_transitions(transition_groups):
 
 
 def print_group_stats(transition_group):
+    """
+    prints stats about a list of transition groups
+    """
     avg_group_size = np.mean(list(map(len, transition_group)))
     num_transitions = sum(map(len, transition_group))
     print(f"Number of transition groups: {len(transition_group)}")
