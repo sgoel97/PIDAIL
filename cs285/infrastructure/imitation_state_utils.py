@@ -99,6 +99,9 @@ def get_group_measures(transition_groups, method="variance"):
 
 
 def prune_transition_groups(transition_groups, prune_config):
+    """
+    gets rid of states within a group (keeps number of groups the same)
+    """
     size_treshold, measure_cutoff, method = prune_config["filtering_kwargs"].values()
 
     measures = get_group_measures(transition_groups, method=method)
@@ -123,6 +126,9 @@ def prune_transition_groups(transition_groups, prune_config):
 
 
 def filter_transition_groups(transition_groups, prune_config):
+    """
+    Deletes entire transition groups
+    """
     size_treshold, measure_cutoff, method = prune_config["filtering_kwargs"].values()
 
     measures = get_group_measures(transition_groups, method=method)

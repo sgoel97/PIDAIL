@@ -4,13 +4,13 @@
 
 ## TODO:
 
-- [alina] implement/copy one of [dqfd, dapg] algorithms from github
+- [alina] implement/copy dqfd algorithm from github
 
 - [alina] Fix filtering logic (currently eliminates groups, should prune groups)
 
-- [samarth] set up logging to compare pruning vs no pruning
+<!-- - [samarth] set up logging to compare pruning vs no pruning -->
 
-- [samarth] set up consistent randomness
+<!-- - [samarth] set up consistent randomness -->
 
 - [samarth] Fix filtering logic (currently eliminates groups, should prune groups)
 
