@@ -98,7 +98,7 @@ def get_group_measures(transition_groups, method="variance"):
     return measures
 
 
-def prune_transition_groups(transition_groups, prune_config):
+def prune_transition_groups(transition_groups, discrete, prune_config):
     """
     gets rid of states within a group (keeps number of groups the same)
     """
@@ -116,7 +116,7 @@ def prune_transition_groups(transition_groups, prune_config):
     for i in range(len(transition_groups)):
         g = transition_groups[i]
         if measure_mask[i] and group_size_mask[i]:
-            if len(g[0]["acts"]) == 1:
+            if discrete:
                 g = prune_group_mode_action(g)
             else:
                 g = prune_group_vector_action(g)

@@ -12,8 +12,6 @@
 
 <!-- - [samarth] set up consistent randomness -->
 
-- [samarth] Fix filtering logic (currently eliminates groups, should prune groups)
-
 - [Jonathan] alter expert data generation to create good but not great (suboptimal) demos
 
   - re-initialize expert weights somehow for each trajectory
