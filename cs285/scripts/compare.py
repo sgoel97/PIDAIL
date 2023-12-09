@@ -47,6 +47,7 @@ if __name__ == "__main__":
         agent=args.agent,
         seed=42,
     )
+    plot_npz(unpruned_log_dir + "/evaluations.npz", unpruned_log_dir)
 
     unpruned_init_weight_file = Path(unpruned_log_dir) / "init_weights.pth"
 
@@ -59,9 +60,11 @@ if __name__ == "__main__":
         seed=42,
         init_weight_file=unpruned_init_weight_file,
     )
+    plot_npz(pruned_log_dir + "/evaluations.npz", pruned_log_dir)
 
     timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
     log_dir = f"{os.getcwd()}/logs/{args.env_name}/{args.agent}_comparison_{timestamp}"
+
     plot_compared_npzs(
         unpruned_log_dir + "/evaluations.npz",
         "unpruned",

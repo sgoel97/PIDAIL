@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from pathlib import Path
 import numpy as np
+import pandas as pd
 
 
 def plot_results(total_steps, values, names, save_path):
@@ -85,6 +86,7 @@ def plot_npz(npz_file, save_path, show=False):
     plt.savefig(save_path / "results.png")
     if show:
         plt.show()
+    plt.clf()
 
 
 def plot_compared_npzs(npz_file1, name1, npz_file2, name2, save_path, show=False):
@@ -111,6 +113,32 @@ def plot_compared_npzs(npz_file1, name1, npz_file2, name2, save_path, show=False
         eval_means2 + eval_stds2,
         alpha=0.25,
     )
+
+    plt.legend()
+    plt.savefig(save_path / "results.png")
+    if show:
+        plt.show()
+
+
+def parse_gail(log_dir):
+    gen_csv = Path(log_dir) / "raw/gen/progress.csv"
+    df = pd.read_csv(gen_csv)
+    eval_return = df["raw/gen/rollout/ep_rew_mean"]
+    episode_lenghts = df["raw/gen/rollout/ep_len_mean"]
+    return eval_return, episode_lenghts
+
+
+def plot_gail_comparison(log_dir1, name1, log_dir2, name2, save_path, show=False):
+    save_path = Path(save_path)
+
+    if not save_path.exists():
+        save_path.mkdir(parents=True, exist_ok=True)
+
+    eval_return1, episode_lengths1 = parse_gail(log_dir1)
+    eval_return2, episode_lengths2 = parse_gail(log_dir2)
+
+    plt.plot(eval_return1, label=name1 + " eval return", color="blue")
+    plt.plot(eval_return2, label=name2 + " eval return", color="orange")
 
     plt.legend()
     plt.savefig(save_path / "results.png")

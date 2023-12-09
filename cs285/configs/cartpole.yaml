@@ -1,4 +1,4 @@
-total_steps: 100000
+total_steps: 1000000
 discrete: True
 
 dqn:

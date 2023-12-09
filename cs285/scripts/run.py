@@ -86,6 +86,7 @@ def training_loop(
         eval_freq=500,
         verbose=0,
         render=False,
+        n_eval_episodes=20,
     )
 
     eval_returns = []
@@ -131,7 +132,7 @@ def training_loop(
                 eval_return, ep_lens = evaluate_policy(
                     bc_trainer.policy,
                     eval_env,
-                    n_eval_episodes=10,
+                    n_eval_episodes=20,
                     deterministic=True,
                     return_episode_rewards=True,
                 )
@@ -241,7 +242,7 @@ def training_loop(
                 eval_return, ep_lens = evaluate_policy(
                     gail_trainer.policy,
                     eval_env,
-                    n_eval_episodes=10,
+                    n_eval_episodes=20,
                     deterministic=True,
                     return_episode_rewards=True,
                 )

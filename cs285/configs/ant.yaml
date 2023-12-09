@@ -1,4 +1,4 @@
-total_steps: 5000
+total_steps: 100000
 discrete: False
 
 sac: { learning_starts: 10000, use_sde: false }
