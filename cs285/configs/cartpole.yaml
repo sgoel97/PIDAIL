@@ -1,4 +1,5 @@
-total_steps: 20000
+total_steps: 1000000
+discrete: True
 
 dqn:
   {

@@ -7,6 +7,11 @@ from sklearn.cluster import AgglomerativeClustering
 
 from imitation.data.types import TrajectoryWithRew, TransitionsWithRew
 
+from infrastructure.imitation_prune_utils import (
+    prune_group_mode_action,
+    prune_group_vector_action,
+)
+
 
 def create_imitation_trajectories(expert_file_path):
     with open(expert_file_path, "rb") as f:
@@ -62,7 +67,7 @@ def get_transition_group_variance(transition_group):
         variance of the actions taken
     """
     actions = [t["acts"] for t in transition_group]
-    return np.var(actions)
+    return np.mean(np.var(actions, axis=-1))
 
 
 def get_transition_group_entropy(transition_group):
@@ -93,7 +98,37 @@ def get_group_measures(transition_groups, method="variance"):
     return measures
 
 
+def prune_transition_groups(transition_groups, discrete, prune_config):
+    """
+    gets rid of states within a group (keeps number of groups the same)
+    """
+    size_treshold, measure_cutoff, method = prune_config["filtering_kwargs"].values()
+
+    measures = get_group_measures(transition_groups, method=method)
+    measure_threshold = np.percentile(measures, measure_cutoff)
+
+    measure_mask = np.array(measures) > measure_threshold
+
+    group_sizes = np.array(list(map(len, transition_groups)))
+    group_size_mask = group_sizes > size_treshold
+
+    valid_transition_groups = []
+    for i in range(len(transition_groups)):
+        g = transition_groups[i]
+        if measure_mask[i] and group_size_mask[i]:
+            if discrete:
+                g = prune_group_mode_action(g)
+            else:
+                g = prune_group_vector_action(g)
+        valid_transition_groups.append(g)
+
+    return valid_transition_groups
+
+
 def filter_transition_groups(transition_groups, prune_config):
+    """
+    Deletes entire transition groups
+    """
     size_treshold, measure_cutoff, method = prune_config["filtering_kwargs"].values()
 
     measures = get_group_measures(transition_groups, method=method)
@@ -113,6 +148,9 @@ def filter_transition_groups(transition_groups, prune_config):
 
 
 def collate_transitions(transition_groups):
+    """
+    Transform list of transition groups into one batched TransitionsWithRew object
+    """
     transitions = []
     for group in transition_groups:
         transitions.extend(group)
@@ -132,6 +170,9 @@ def collate_transitions(transition_groups):
 
 
 def print_group_stats(transition_group):
+    """
+    prints stats about a list of transition groups
+    """
     avg_group_size = np.mean(list(map(len, transition_group)))
     num_transitions = sum(map(len, transition_group))
     print(f"Number of transition groups: {len(transition_group)}")

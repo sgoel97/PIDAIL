@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import numpy as np
 
 sys.path.append(os.getcwd() + "/cs285/")
 
@@ -18,6 +19,7 @@ from stable_baselines3.ppo import MlpPolicy
 
 import tempfile
 from imitation.algorithms import bc
+from imitation.algorithms.bc import RolloutStatsComputer
 from imitation.policies.serialize import load_policy
 from imitation.data import rollout
 from imitation.util.util import make_vec_env
@@ -36,13 +38,13 @@ from infrastructure.plotting_utils import *
 from infrastructure.scripting_utils import *
 from infrastructure.imitation_agent_utils import *
 
-from agents.dqfd import DQfDAgent
-
-discrete_agents = ["dqn", "sqil", "dagger", "bc", "dqfd"]
+discrete_agents = ["dqn", "sqil", "dagger", "bc", "gail", "dqfd"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
 
 
-def training_loop(env_name, using_demos, prune, config, agent, seed):
+def training_loop(
+    env_name, using_demos, prune, config, agent, seed, init_weight_file=None
+):
     # Set up environment, hyperparameters, and data storage
     total_steps = config["total_steps"]
     gym_env_name = get_env(env_name)
@@ -84,10 +86,11 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
         eval_freq=500,
         verbose=0,
         render=False,
+        n_eval_episodes=20,
     )
 
     eval_returns = []
-    eval_returns_stds = []
+    episode_lengths = []
 
     if using_demos:
         expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
@@ -101,7 +104,8 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
             print("Before Filtering:\n############################")
             print_group_stats(groups)
 
-            filtered_groups = filter_transition_groups(groups, prune_config)
+            # filtered_groups = filter_transition_groups(groups, prune_config)
+            filtered_groups = prune_transition_groups(groups, discrete, prune_config)
             print("\nAfter Filtering:\n############################")
             print_group_stats(filtered_groups)
 
@@ -117,9 +121,28 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 custom_logger=imitation_logger,
             )
 
+            if init_weight_file is not None:
+                bc_trainer.policy.load_state_dict(torch.load(init_weight_file))
+            else:
+                torch.save(
+                    bc_trainer.policy.state_dict(), Path(log_dir) / "init_weights.pth"
+                )
+
+            def evaluate():
+                eval_return, ep_lens = evaluate_policy(
+                    bc_trainer.policy,
+                    eval_env,
+                    n_eval_episodes=20,
+                    deterministic=True,
+                    return_episode_rewards=True,
+                )
+                eval_returns.append(eval_return)
+                episode_lengths.append(ep_lens)
+
             bc_trainer.train(
                 n_epochs=total_steps // 1000,
-                log_rollouts_venv=eval_env,
+                # log_rollouts_venv=eval_env,
+                on_epoch_end=evaluate,
                 progress_bar=True,
             )
             agent = bc_trainer.policy
@@ -169,10 +192,21 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 venv=env,
                 demonstrations=rollouts,
                 policy="MlpPolicy",
-                rng=rng,
                 custom_logger=imitation_logger,
             )
-            sqil_trainer.train(total_timesteps=total_steps, progress_bar=True)
+
+            if init_weight_file is not None:
+                sqil_trainer.policy.load_state_dict(torch.load(init_weight_file))
+            else:
+                torch.save(
+                    sqil_trainer.policy.state_dict(), Path(log_dir) / "init_weights.pth"
+                )
+
+            sqil_trainer.train(
+                total_timesteps=total_steps,
+                progress_bar=True,
+                callback=eval_callback,
+            )
             agent = sqil_trainer.policy
 
         # GAIL
@@ -203,9 +237,19 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
                 allow_variable_horizon=True,
                 custom_logger=imitation_logger,
             )
-            gail_trainer.train(
-                total_timesteps=total_steps,
-            )
+
+            def evaluate(_):
+                eval_return, ep_lens = evaluate_policy(
+                    gail_trainer.policy,
+                    eval_env,
+                    n_eval_episodes=20,
+                    deterministic=True,
+                    return_episode_rewards=True,
+                )
+                eval_returns.append(eval_return)
+                episode_lengths.append(ep_lens)
+
+            gail_trainer.train(total_timesteps=total_steps, callback=evaluate)
             agent = gail_trainer.policy
         
         if agent_name == "dqfd":
@@ -228,6 +272,10 @@ def training_loop(env_name, using_demos, prune, config, agent, seed):
     else:
         avg_eval_return, std_eval_return = evaluate_policy(
             agent, eval_env, n_eval_episodes=10, deterministic=True
+        )
+    if agent_name == "bc" or agent_name == "gail":
+        np.savez_compressed(
+            log_dir + "/evaluations", results=eval_returns, ep_lengths=episode_lengths
         )
     print("avg. eval return:", avg_eval_return)
     print("std. eval return:", std_eval_return)
@@ -293,21 +341,4 @@ if __name__ == "__main__":
         args.env_name, args.demos, args.prune, config, agent=args.agent, seed=args.seed
     )
 
-    rollout_stats = [
-        "rollout/return_max",
-        "rollout/return_mean",
-        "rollout/return_min",
-        "rollout/return_std",
-    ]
-    stats = parse_tensorboard(
-        log_dir,
-        rollout_stats,
-    )
-
-    if args.graph:
-        plot_results(
-            total_steps,
-            list(map(lambda x: x.value, stats.values())),
-            list(stats.keys()),
-            log_dir,
-        )
+    plot_npz(log_dir + "/evaluations.npz", log_dir, show=args.graph)

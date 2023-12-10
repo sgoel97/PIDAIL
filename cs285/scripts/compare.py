@@ -10,6 +10,7 @@ from infrastructure.plotting_utils import *
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
+    agent_choices = ["bc", "sqil", "gail"]
 
     parser.add_argument(
         "--env_name",
@@ -26,56 +27,49 @@ if __name__ == "__main__":
         help="Whether or not to graph results",
     )
 
+    parser.add_argument(
+        "--agent",
+        "-a",
+        choices=agent_choices,
+        default="bc",
+        help="Which agent to train",
+    )
+
     args = parser.parse_args()
 
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
 
     total_steps, unpruned_log_dir = training_loop(
-        args.env_name, using_demos=True, prune=False, config=config, agent="bc", seed=42
+        args.env_name,
+        using_demos=True,
+        prune=False,
+        config=config,
+        agent=args.agent,
+        seed=42,
     )
+    plot_npz(unpruned_log_dir + "/evaluations.npz", unpruned_log_dir)
+
+    unpruned_init_weight_file = Path(unpruned_log_dir) / "init_weights.pth"
 
     total_steps, pruned_log_dir = training_loop(
-        args.env_name, using_demos=True, prune=True, config=config, agent="bc", seed=42
+        args.env_name,
+        using_demos=True,
+        prune=True,
+        config=config,
+        agent=args.agent,
+        seed=42,
+        init_weight_file=unpruned_init_weight_file,
     )
-
-    rollout_stats = [
-        "rollout/return_max",
-        "rollout/return_mean",
-        "rollout/return_min",
-        "rollout/return_std",
-    ]
-
-    unpruned_stats = parse_tensorboard(
-        unpruned_log_dir,
-        rollout_stats,
-    )
-
-    pruned_stats = parse_tensorboard(
-        pruned_log_dir,
-        rollout_stats,
-    )
+    plot_npz(pruned_log_dir + "/evaluations.npz", pruned_log_dir)
 
     timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
-    log_dir = f"{os.getcwd()}/logs/{args.env_name}/bc_comparison_{timestamp}"
+    log_dir = f"{os.getcwd()}/logs/{args.env_name}/{args.agent}_comparison_{timestamp}"
 
-    unpruned_dfs = list(map(lambda x: x.value, unpruned_stats.values()))
-    pruned_dfs = list(map(lambda x: x.value, pruned_stats.values()))
-
-    unpruned_keys = ["unpruned_" + k for k in list(unpruned_stats.keys())]
-    pruned_keys = ["pruned_" + k for k in list(pruned_stats.keys())]
-
-    for i, file_ext in enumerate(["max", "mean", "min", "std"]):
-        plot_comparison_results(
-            unpruned_dfs[i : i + 1],
-            pruned_dfs[i : i + 1],
-            unpruned_keys[i : i + 1],
-            pruned_keys[i : i + 1],
-            log_dir,
-            show=False,
-            file_ext=file_ext,
-        )
-
-    if args.graph:
-        plot_comparison_results(
-            unpruned_dfs, pruned_dfs, unpruned_keys, pruned_keys, log_dir, show=True
-        )
+    plot_compared_npzs(
+        unpruned_log_dir + "/evaluations.npz",
+        "unpruned",
+        pruned_log_dir + "/evaluations.npz",
+        "pruned",
+        log_dir,
+        show=args.graph,
+    )
