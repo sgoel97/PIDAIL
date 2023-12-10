@@ -6,7 +6,7 @@ from torch.distributions import Categorical
 from sklearn.cluster import AgglomerativeClustering
 
 from infrastructure.Transition import Transition
-from infrastructure.Trajectory import Trajectory
+from cs285.infrastructure.custom_data_types import Trajectory
 
 
 def create_trajectories(expert_file_path):

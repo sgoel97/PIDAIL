@@ -45,7 +45,9 @@ prune_config:
     },
   outcome_filtering_kwargs:
     {
-      TODO: "todo"
+      horizon: 10,
+      metric: "variance",
+      cutoff: 90
     }
 }
 

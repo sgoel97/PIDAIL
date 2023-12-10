@@ -37,11 +37,12 @@ from infrastructure.imitation_state_utils import *
 from infrastructure.plotting_utils import *
 from infrastructure.scripting_utils import *
 from infrastructure.imitation_agent_utils import *
+from infrastructure.custom_data_types import *
 
 discrete_agents = ["dqn", "sqil", "dagger", "bc", "gail", "dqfd"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
 cluster_types = ["agglomerative"]
-prune_types = ["group", "action", "outcome"]
+prune_types = ["group", "action", "outcome", "value"]
 
 
 def training_loop(
@@ -96,8 +97,17 @@ def training_loop(
 
     if using_demos:
         expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
-        rollouts = create_imitation_trajectories(expert_file_path)
-        transitions = rollout.flatten_trajectories_with_rew(rollouts)
+
+        prune_config = config["prune_config"]
+        prune_type = prune_config["prune_type"]
+        assert prune_type in prune_types, f"prune_type config must be one of {prune_types}"
+
+        if prune and prune_type == "outcome":
+            rollouts = create_imitation_trajectories(expert_file_path, custom = True)
+            transitions = Trajectory.flatten_trajectories(rollouts)
+        else:
+            rollouts = create_imitation_trajectories(expert_file_path)
+            transitions = rollout.flatten_trajectories_with_rew(rollouts)
 
         if prune:
             cluster_config = config["cluster_config"]
@@ -108,13 +118,14 @@ def training_loop(
             print("Before Filtering:\n############################")
             print_group_stats(groups)
 
-            prune_config = config["prune_config"]
-            prune_type = prune_config["prune_type"]
-            assert prune_type in prune_types, f"prune_type config must be one of {prune_types}"
             if prune_type == "group":
                 filtered_groups = filter_transition_groups(groups, prune_config["group_filtering_kwargs"])
             elif prune_type == "action":
                 filtered_groups = prune_transition_groups(groups, discrete, prune_config["action_filtering_kwargs"])
+            elif prune_type == "outcome":
+                filtered_groups = filter_groups_by_outcome(rollouts, groups, prune_config["outcome_filtering_kwargs"])
+            elif prune_type == "value":
+                filtered_groups = prune_groups_by_value(groups, discrete)
             print("\nAfter Filtering:\n############################")
             print_group_stats(filtered_groups)
 

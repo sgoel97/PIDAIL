@@ -11,20 +11,31 @@ from infrastructure.imitation_prune_utils import (
     prune_group_mode_action,
     prune_group_vector_action,
 )
+from infrastructure.custom_data_types import *
 
 
-def create_imitation_trajectories(expert_file_path):
+def create_imitation_trajectories(expert_file_path, custom = False):
     with open(expert_file_path, "rb") as f:
         demos = pickle.load(f)
     rollouts = []
     for demo in demos:
-        trajectory = TrajectoryWithRew(
-            obs=demo["observation"],
-            acts=demo["action"][:-1],
-            infos=None,
-            terminal=True,
-            rews=demo["reward"][:-1],
-        )
+        if custom:
+            trajectory = Trajectory()
+            for i in range(len(demo) - 1):
+                trajectory.transitions.append(Transition(demo["observation"][i],
+                                                         demo["action"][i],
+                                                         demo["observation"][i + 1],
+                                                         demo["reward"][i],
+                                                         i == len(demo) - 2,
+                                                         i))
+        else:
+            trajectory = TrajectoryWithRew(
+                obs=demo["observation"],
+                acts=demo["action"][:-1],
+                infos=None,
+                terminal=True,
+                rews=demo["reward"][:-1],
+            )
         rollouts.append(trajectory)
     return rollouts
 
@@ -56,7 +67,7 @@ def group_transitions(transitions, cluster_config):
     return grouped_transitions
 
 
-def get_transition_group_variance(transition_group):
+def get_transition_group_variance(transition_group, custom = False):
     """
     Gets the average variance of actions taken by expert from a given group of
     observations characterized by a transition group
@@ -66,11 +77,14 @@ def get_transition_group_variance(transition_group):
     returns:
         variance of the actions taken
     """
-    actions = [t["acts"] for t in transition_group]
+    if custom:
+        actions = [t.action for t in transition_group]
+    else:
+        actions = [t["acts"] for t in transition_group]
     return np.mean(np.var(actions, axis=-1))
 
 
-def get_transition_group_entropy(transition_group):
+def get_transition_group_entropy(transition_group, custom = False):
     """
     Gets the average variance of actions taken by expert from a given group of
     observations characterized by a transition group
@@ -80,7 +94,10 @@ def get_transition_group_entropy(transition_group):
     returns:
         variance of the actions taken
     """
-    actions = [t["acts"] for t in transition_group]
+    if custom:
+        actions = [t.action for t in transition_group]
+    else:
+        actions = [t["acts"] for t in transition_group]
     counts = pd.Series(actions).value_counts().to_numpy()
     probs = torch.tensor(counts / len(transition_group))
     entropy = Categorical(probs=probs).entropy()
@@ -88,13 +105,13 @@ def get_transition_group_entropy(transition_group):
     return entropy.item()
 
 
-def get_group_measures(transition_groups, method="variance"):
+def get_group_measures(transition_groups, method="variance", custom = False):
     if method == "variance":
         measure_func = get_transition_group_variance
     else:
         measure_func = get_transition_group_entropy
 
-    measures = [measure_func(g) for g in transition_groups]
+    measures = [measure_func(g, custom = custom) for g in transition_groups]
     return measures
 
 
@@ -123,6 +140,40 @@ def prune_transition_groups(transition_groups, discrete, prune_config):
         valid_transition_groups.append(g)
 
     return valid_transition_groups
+
+
+def prune_groups_by_value(groups, discrete):
+    """
+    Calculates Q-values of demonstrated actions
+    Gets rid of samples WITHIN a group
+    """
+    if discrete:
+
+
+
+def filter_groups_by_outcome(rollouts, groups, prune_config):
+    """
+    For each group of similar states, move forward `horizon` steps to get to outcome states
+    For each group of outcome states, remove those that have too high variance/entropy
+    Deletes entire transition groups
+    """
+    horizon, metric, cutoff = prune_config.values()
+    outcome_groups = []
+    for group in groups:
+        outcomes = []
+        for transition in group:
+            traj_idx = transition.traj_idx
+            trans_idx = transition.trans_idx
+            try:
+                outcomes.append(rollouts[traj_idx].transitions[trans_idx + horizon])
+            except IndexError:
+                outcomes.append(rollouts[traj_idx].transitions[-1])
+        outcome_groups.append(outcomes)
+    outcome_measures = get_group_measures(outcome_groups, method = metric, custom = True)
+    measure_threshold = np.percentile(outcome_measures, cutoff)
+    measure_mask = np.array(outcome_measures) < measure_threshold
+    resulting_groups = [groups[i] for i in range(len(groups)) if measure_mask[i]]
+    return resulting_groups
 
 
 def filter_transition_groups(transition_groups, prune_config):
