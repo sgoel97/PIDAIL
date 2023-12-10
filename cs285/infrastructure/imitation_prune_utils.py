@@ -40,10 +40,30 @@ def prune_group_action_percentile(group, percentile=1):
         cumProb += prob * 1.0 / numActions
         goodActions[action] = 1
 
-        if cumProb > percentile:
+        if cumProb > percentile / 100.0:
             break
 
     return [g for g in group if g["acts"] in goodActions]
+
+def prune_group_continuous_action_percentile(group, percentile=99, agg = "or"):
+    """
+    prunes groups based on actions - all or any of the remaining dimensions must be within a percentile of the median. 
+
+    """
+    actions = [g["acts"] for g in group]
+    action_dim = len(actions[0])
+    lower_bound = np.percentile(actions, 50 - percentile // 2, axis=1)
+    upper_bound = np.percentile(actions, 50 + percentile // 2, axis=1)
+
+    assert lower_bound.shape == (action_dim, )
+    assert upper_bound.shape == (action_dim, )
+
+    if agg == "or":
+        return [g for g in group if any(np.logical_and(lower_bound <= g, g <= upper_bound))]
+    elif agg == "and":
+        return [g for g in group if all(np.logical_or(lower_bound <= g, g <= upper_bound))]
+    else:
+        raise NotImplementedError("idk what you are doing - jg")
 
 
 def prune_group_vector_action(group, percentile=50):
