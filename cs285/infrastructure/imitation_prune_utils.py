@@ -11,6 +11,40 @@ def prune_group_mode_action(group):
     pruned_group = [g for g in group if g["acts"] == majority_action]
     return pruned_group
 
+def prune_group_action_percentile(group, percentile=1):
+    """
+    Only keeps states within a group that take the top percentile percentile action within the group - discrete
+    """
+    actions = [g["acts"] for g in group]
+
+    numActions = len(actions)
+
+    # manual computation because I (jg) am lazy
+    counter = {}
+    for action in actions:
+        if action in counter:
+            counter[action] += 1.0
+        else:
+            counter[action] = 1.0
+
+    array = []
+    for action in counter.keys():
+        array.append(counter[action], action)
+
+    array.sort(key = lambda x: -x[0])
+
+    goodActions = {}
+
+    cumProb = 0.0
+    for prob, action in array:
+        cumProb += prob * 1.0 / numActions
+        goodActions[action] = 1
+
+        if cumProb > percentile:
+            break
+
+    return [g for g in group if g["acts"] in goodActions]
+
 
 def prune_group_vector_action(group, percentile=50):
     """
