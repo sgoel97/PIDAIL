@@ -40,6 +40,8 @@ from infrastructure.imitation_agent_utils import *
 
 discrete_agents = ["dqn", "sqil", "dagger", "bc", "gail", "dqfd"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
+cluster_types = ["agglomerative"]
+prune_types = ["group", "action", "outcome"]
 
 
 def training_loop(
@@ -98,14 +100,21 @@ def training_loop(
         transitions = rollout.flatten_trajectories_with_rew(rollouts)
 
         if prune:
-            prune_config = config["prune_config"]
-
-            groups = group_transitions(transitions, prune_config)
+            cluster_config = config["cluster_config"]
+            cluster_type = cluster_config["cluster_type"]
+            assert cluster_type in cluster_types, f"cluster_type config must be one of {cluster_types}"
+            if cluster_type == "agglomerative":
+                groups = group_transitions(transitions, cluster_config["agglomerative_clustering_kwargs"])
             print("Before Filtering:\n############################")
             print_group_stats(groups)
 
-            # filtered_groups = filter_transition_groups(groups, prune_config)
-            filtered_groups = prune_transition_groups(groups, discrete, prune_config)
+            prune_config = config["prune_config"]
+            prune_type = prune_config["prune_type"]
+            assert prune_type in prune_types, f"prune_type config must be one of {prune_types}"
+            if prune_type == "group":
+                filtered_groups = filter_transition_groups(groups, prune_config["group_filtering_kwargs"])
+            elif prune_type == "action":
+                filtered_groups = prune_transition_groups(groups, discrete, prune_config["action_filtering_kwargs"])
             print("\nAfter Filtering:\n############################")
             print_group_stats(filtered_groups)
 

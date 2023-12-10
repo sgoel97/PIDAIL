@@ -10,6 +10,7 @@ class Transition:
         self.next_obs = next_obs
         self.reward = reward
         self.done = done
+        self.traj_idx
 
     # def compare(self, other):
     #     dot = np.dot(self.obs, other.obs)

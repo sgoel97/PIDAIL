@@ -29,7 +29,7 @@ def create_imitation_trajectories(expert_file_path):
     return rollouts
 
 
-def group_transitions(transitions, prune_config):
+def group_transitions(transitions, cluster_config):
     """
     params:
         transitions: Transitions object from imitation library
@@ -38,7 +38,7 @@ def group_transitions(transitions, prune_config):
     """
     # Create clustering model
     clustering_model = AgglomerativeClustering(
-        n_clusters=None, **prune_config["agglomerative_clustering_kwargs"]
+        n_clusters=None, **cluster_config
     )
 
     # Fit clustering model on transitions
@@ -102,7 +102,7 @@ def prune_transition_groups(transition_groups, discrete, prune_config):
     """
     gets rid of states within a group (keeps number of groups the same)
     """
-    size_treshold, measure_cutoff, method = prune_config["filtering_kwargs"].values()
+    size_threshold, measure_cutoff, method, percentile = prune_config.values()
 
     measures = get_group_measures(transition_groups, method=method)
     measure_threshold = np.percentile(measures, measure_cutoff)
@@ -110,7 +110,7 @@ def prune_transition_groups(transition_groups, discrete, prune_config):
     measure_mask = np.array(measures) > measure_threshold
 
     group_sizes = np.array(list(map(len, transition_groups)))
-    group_size_mask = group_sizes > size_treshold
+    group_size_mask = group_sizes > size_threshold
 
     valid_transition_groups = []
     for i in range(len(transition_groups)):
@@ -119,7 +119,7 @@ def prune_transition_groups(transition_groups, discrete, prune_config):
             if discrete:
                 g = prune_group_mode_action(g)
             else:
-                g = prune_group_vector_action(g)
+                g = prune_group_vector_action(g, percentile = percentile)
         valid_transition_groups.append(g)
 
     return valid_transition_groups
@@ -129,14 +129,14 @@ def filter_transition_groups(transition_groups, prune_config):
     """
     Deletes entire transition groups
     """
-    size_treshold, measure_cutoff, method = prune_config["filtering_kwargs"].values()
+    size_threshold, measure_cutoff, method = prune_config.values()
 
     measures = get_group_measures(transition_groups, method=method)
     measure_threshold = np.percentile(measures, measure_cutoff)
     measure_mask = np.array(measures) < measure_threshold
 
     group_sizes = np.array(list(map(len, transition_groups)))
-    group_size_mask = group_sizes < size_treshold
+    group_size_mask = group_sizes < size_threshold
 
     valid_transition_groups = [
         transition_groups[i]

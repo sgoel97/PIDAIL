@@ -3,10 +3,35 @@ discrete: True
 
 dqn: { learning_starts: 10000 }
 
+cluster_config:
+  {
+    cluster_type: "agglomerative",
+    agglomerative_clustering_kwargs:
+      {
+        metric: "l2",
+        linkage: "average",
+        distance_threshold: 0.2
+      }
+  }
+
 prune_config:
   {
-    agglomerative_clustering_kwargs:
-      { metric: "l2", linkage: "average", distance_threshold: 0.2 },
-    filtering_kwargs:
-      { size_treshold: 10, measure_cutoff: 80, method: "variance" },
+    prune_type: "group",
+    group_filtering_kwargs:
+      {
+        size_threshold: 10,
+        measure_cutoff: 80,
+        method: "variance"
+      },
+    action_filtering_kwargs:
+      {
+        size_threshold: 10,
+        measure_cutoff: 80,
+        method: "variance",
+        percentile: 50
+      },
+    outcome_filtering_kwargs:
+      {
+        TODO: "todo"
+      }
   }

@@ -5,10 +5,35 @@ sac: { learning_starts: 10000, use_sde: false }
 
 td3: { learning_starts: 10000 }
 
+cluster_config:
+  {
+    cluster_type: "agglomerative",
+    agglomerative_clustering_kwargs:
+      {
+        metric: "l2",
+        linkage: "average",
+        distance_threshold: 3.5
+      }
+  }
+
 prune_config:
   {
-    agglomerative_clustering_kwargs:
-      { metric: "l2", linkage: "average", distance_threshold: 3.5 },
-    filtering_kwargs:
-      { size_treshold: 3, measure_cutoff: 80, method: "entropy" },
+    prune_type: "group",
+    group_filtering_kwargs:
+      {
+        size_threshold: 3,
+        measure_cutoff: 80,
+        method: "entropy"
+      },
+    action_filtering_kwargs:
+      {
+        size_threshold: 10,
+        measure_cutoff: 80,
+        method: "variance",
+        percentile: 50
+      },
+    outcome_filtering_kwargs:
+      {
+        TODO: "todo"
+      }
   }
