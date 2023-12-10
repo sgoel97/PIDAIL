@@ -147,8 +147,7 @@ def prune_groups_by_value(groups, discrete):
     Calculates Q-values of demonstrated actions
     Gets rid of samples WITHIN a group
     """
-    if discrete:
-
+    pass
 
 
 def filter_groups_by_outcome(rollouts, groups, prune_config):
