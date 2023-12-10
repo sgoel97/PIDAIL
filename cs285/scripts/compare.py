@@ -35,9 +35,17 @@ if __name__ == "__main__":
         help="Which agent to train",
     )
 
+    parser.add_argument(
+        "--seed",
+        "-s",
+        default=42,
+        help="Which random seed to use",
+    )
+
     args = parser.parse_args()
 
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
+    timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
 
     total_steps, unpruned_log_dir = training_loop(
         args.env_name,
@@ -45,7 +53,8 @@ if __name__ == "__main__":
         prune=False,
         config=config,
         agent=args.agent,
-        seed=42,
+        seed=args.seed,
+        timestamp=timestamp,
     )
     plot_npz(unpruned_log_dir + "/evaluations.npz", unpruned_log_dir)
 
@@ -57,12 +66,12 @@ if __name__ == "__main__":
         prune=True,
         config=config,
         agent=args.agent,
-        seed=42,
+        seed=args.seed,
         init_weight_file=unpruned_init_weight_file,
+        timestamp=timestamp,
     )
     plot_npz(pruned_log_dir + "/evaluations.npz", pruned_log_dir)
 
-    timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
     log_dir = f"{os.getcwd()}/logs/{args.env_name}/{args.agent}_comparison_{timestamp}"
 
     plot_compared_npzs(

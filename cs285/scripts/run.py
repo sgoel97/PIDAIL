@@ -46,7 +46,14 @@ prune_types = ["group", "action", "outcome", "value"]
 
 
 def training_loop(
-    env_name, using_demos, prune, config, agent, seed, init_weight_file=None
+    env_name,
+    using_demos,
+    prune,
+    config,
+    agent,
+    seed,
+    init_weight_file=None,
+    timestamp=None,
 ):
     # Set up environment, hyperparameters, and data storage
     total_steps = config["total_steps"]
@@ -75,7 +82,8 @@ def training_loop(
     check_agent_env(agent_name, discrete, discrete_agents, continous_agents)
 
     # Set up logging
-    timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
+    if timestamp is None:
+        timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
     ext = "_pruned" if prune else ""
     log_dir = f"{os.getcwd()}/logs/{env_name}/{agent_name}{ext}_{timestamp}"
     logger = configure(log_dir, ["tensorboard"])
@@ -100,10 +108,12 @@ def training_loop(
 
         prune_config = config["prune_config"]
         prune_type = prune_config["prune_type"]
-        assert prune_type in prune_types, f"prune_type config must be one of {prune_types}"
+        assert (
+            prune_type in prune_types
+        ), f"prune_type config must be one of {prune_types}"
 
         if prune and prune_type == "outcome":
-            rollouts = create_imitation_trajectories(expert_file_path, custom = True)
+            rollouts = create_imitation_trajectories(expert_file_path, custom=True)
             transitions = Trajectory.flatten_trajectories(rollouts)
         else:
             rollouts = create_imitation_trajectories(expert_file_path)
@@ -112,18 +122,28 @@ def training_loop(
         if prune:
             cluster_config = config["cluster_config"]
             cluster_type = cluster_config["cluster_type"]
-            assert cluster_type in cluster_types, f"cluster_type config must be one of {cluster_types}"
+            assert (
+                cluster_type in cluster_types
+            ), f"cluster_type config must be one of {cluster_types}"
             if cluster_type == "agglomerative":
-                groups = group_transitions(transitions, cluster_config["agglomerative_clustering_kwargs"])
+                groups = group_transitions(
+                    transitions, cluster_config["agglomerative_clustering_kwargs"]
+                )
             print("Before Filtering:\n############################")
             print_group_stats(groups)
 
             if prune_type == "group":
-                filtered_groups = filter_transition_groups(groups, prune_config["group_filtering_kwargs"])
+                filtered_groups = filter_transition_groups(
+                    groups, prune_config["group_filtering_kwargs"]
+                )
             elif prune_type == "action":
-                filtered_groups = prune_transition_groups(groups, discrete, prune_config["action_filtering_kwargs"])
+                filtered_groups = prune_transition_groups(
+                    groups, discrete, prune_config["action_filtering_kwargs"]
+                )
             elif prune_type == "outcome":
-                filtered_groups = filter_groups_by_outcome(rollouts, groups, prune_config["outcome_filtering_kwargs"])
+                filtered_groups = filter_groups_by_outcome(
+                    rollouts, groups, prune_config["outcome_filtering_kwargs"]
+                )
             elif prune_type == "value":
                 filtered_groups = prune_groups_by_value(groups, discrete)
             print("\nAfter Filtering:\n############################")
@@ -271,7 +291,7 @@ def training_loop(
 
             gail_trainer.train(total_timesteps=total_steps, callback=evaluate)
             agent = gail_trainer.policy
-        
+
         if agent_name == "dqfd":
             agent = DQfDAgent(gym.make(gym_env_name))
             agent.set_log_dir(log_dir)
