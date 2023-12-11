@@ -8,8 +8,11 @@ from sklearn.cluster import AgglomerativeClustering
 from imitation.data.types import TrajectoryWithRew, TransitionsWithRew
 
 from infrastructure.imitation_prune_utils import (
-    prune_group_mode_action,
-    prune_group_vector_action,
+    # prune_group_mode_action, # this is covered by action percentile as you can just set percentile to be epsilon
+    # prune_group_vector_action, # i don't like this - jg
+    prune_group_action_percentile, 
+    prune_group_continuous_action_percentile, 
+    prune_group_mean_action_distance, 
 )
 from infrastructure.custom_data_types import *
 
@@ -133,10 +136,12 @@ def prune_transition_groups(transition_groups, discrete, prune_config):
     for i in range(len(transition_groups)):
         g = transition_groups[i]
         if measure_mask[i] and group_size_mask[i]:
-            if discrete:
-                g = prune_group_mode_action(g)
+            if discrete: # TODO add other pruning methods
+                # g = prune_group_mode_action(g)
+                g = prune_group_action_percentile(g, percentile = percentile)
             else:
-                g = prune_group_vector_action(g, percentile = percentile)
+                # g = prune_group_vector_action(g, percentile = percentile)
+                g = prune_group_mean_action_distance(g, percentile = percentile)
         valid_transition_groups.append(g)
 
     return valid_transition_groups

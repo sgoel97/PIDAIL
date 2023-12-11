@@ -29,5 +29,5 @@ class Trajectory:
             traj = trajectories[i]
             for trans in traj.transitions:
                 trans.traj_idx = i
-            all_transitions.extend(transitions)
+            all_transitions.extend(traj.transitions)
         return all_transitions

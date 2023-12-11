@@ -42,6 +42,13 @@ if __name__ == "__main__":
         help="Which random seed to use",
     )
 
+    parser.add_argument(
+        "--eval_runs",
+        "-r", 
+        help="number of eval runs", 
+        default=20, 
+    )
+
     args = parser.parse_args()
 
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
@@ -55,6 +62,7 @@ if __name__ == "__main__":
         agent=args.agent,
         seed=args.seed,
         timestamp=timestamp,
+        num_eval_runs=int(args.eval_runs), 
     )
     plot_npz(unpruned_log_dir + "/evaluations.npz", unpruned_log_dir)
 
@@ -69,6 +77,7 @@ if __name__ == "__main__":
         seed=args.seed,
         init_weight_file=unpruned_init_weight_file,
         timestamp=timestamp,
+        num_eval_runs=int(args.eval_runs),
     )
     plot_npz(pruned_log_dir + "/evaluations.npz", pruned_log_dir)
 

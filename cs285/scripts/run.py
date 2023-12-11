@@ -52,6 +52,7 @@ def training_loop(
     config,
     agent,
     seed,
+    num_eval_runs=20, 
     init_weight_file=None,
     timestamp=None,
 ):
@@ -97,7 +98,7 @@ def training_loop(
         eval_freq=500,
         verbose=0,
         render=False,
-        n_eval_episodes=20,
+        n_eval_episodes=num_eval_runs,
     )
 
     eval_returns = []
@@ -172,7 +173,7 @@ def training_loop(
                 eval_return, ep_lens = evaluate_policy(
                     bc_trainer.policy,
                     eval_env,
-                    n_eval_episodes=20,
+                    n_eval_episodes=num_eval_runs,
                     deterministic=True,
                     return_episode_rewards=True,
                 )
@@ -282,7 +283,7 @@ def training_loop(
                 eval_return, ep_lens = evaluate_policy(
                     gail_trainer.policy,
                     eval_env,
-                    n_eval_episodes=20,
+                    n_eval_episodes=num_eval_runs,
                     deterministic=True,
                     return_episode_rewards=True,
                 )
@@ -308,10 +309,10 @@ def training_loop(
 
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
-        avg_eval_return, std_eval_return = agent.evaluate()
+        avg_eval_return, std_eval_return = agent.evaluate(n_eval_episodes=num_eval_runs)
     else:
         avg_eval_return, std_eval_return = evaluate_policy(
-            agent, eval_env, n_eval_episodes=10, deterministic=True
+            agent, eval_env, n_eval_episodes=num_eval_runs, deterministic=True
         )
     if agent_name == "bc" or agent_name == "gail":
         np.savez_compressed(
@@ -369,6 +370,12 @@ if __name__ == "__main__":
         help=f"random seed for reproducibility",
         default=42,
     )
+    parser.add_argument(
+        "--eval_runs",
+        "-r", 
+        help="number of eval runs", 
+        default=20, 
+    )
 
     args = parser.parse_args()
 
@@ -378,7 +385,7 @@ if __name__ == "__main__":
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
 
     total_steps, log_dir = training_loop(
-        args.env_name, args.demos, args.prune, config, agent=args.agent, seed=args.seed
+        args.env_name, args.demos, args.prune, config, agent=args.agent, seed=args.seed, num_eval_runs=int(args.eval_runs)
     )
 
     plot_npz(log_dir + "/evaluations.npz", log_dir, show=args.graph)
