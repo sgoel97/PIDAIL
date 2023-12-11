@@ -29,7 +29,7 @@ def prune_group_action_percentile(group, percentile=1):
 
     array = []
     for action in counter.keys():
-        array.append(counter[action], action)
+        array.append((counter[action], action))
 
     array.sort(key = lambda x: -x[0])
 
@@ -59,27 +59,29 @@ def prune_group_continuous_action_percentile(group, percentile=99, agg = "or"):
     assert upper_bound.shape == (action_dim, )
 
     if agg == "or":
-        return [g for g in group if any(np.logical_and(lower_bound <= g, g <= upper_bound))]
+        return [g for g in group if any(np.logical_and(lower_bound <= g["acts"], g["acts"] <= upper_bound))]
     elif agg == "and":
-        return [g for g in group if all(np.logical_or(lower_bound <= g, g <= upper_bound))]
+        return [g for g in group if all(np.logical_or(lower_bound <= g["acts"], g["acts"] <= upper_bound))]
     else:
         raise NotImplementedError("idk what you are doing - jg")
     
-def prune_group_mean_action_distance(group, percentile=50):
+def prune_group_mean_action_distance(group, percentile=80):
     """
     prunes groups based on actions' L2 distance from the mean action of the group, using a percentile cutoff. 
     TODO implement weighted, so each coordinate is not treated the same
     """
+    # print("test")
+    # print(group)
     actions = [g["acts"] for g in group]
     action_dim = len(actions[0])
     mean_action = np.mean(actions, axis=0)
     assert mean_action.shape == (action_dim, )
 
     action_dists = [np.linalg.norm(action - mean_action) for action in actions]
-    lower_bound = np.percentile(action_dists, 50 - percentile // 2, axis=1)
-    upper_bound = np.percentile(action_dists, 50 + percentile // 2, axis=1)
+    lower_bound = np.percentile(action_dists, 50 - percentile // 2)
+    upper_bound = np.percentile(action_dists, 50 + percentile // 2)
 
-    return [act for act, dist in zip(actions, action_dists) if lower_bound <= dist and dist <= upper_bound]
+    return [g for g, dist in zip(group, action_dists) if lower_bound <= dist and dist <= upper_bound]
 
 
 def prune_group_vector_action(group, percentile=50):
