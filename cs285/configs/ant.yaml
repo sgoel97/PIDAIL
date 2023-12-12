@@ -7,14 +7,16 @@ td3: { learning_starts: 10000 }
 
 cluster_config:
   {
-    cluster_type: "agglomerative",
+    cluster_type: "kmeans",
     agglomerative_clustering_kwargs:
       { metric: "l2", linkage: "average", distance_threshold: 3.5 },
+    kmeans_clustering_kwargs:
+      { n_clusters: 100, max_iter: 300, algorithm: "lloyd" },
   }
 
 prune_config:
   {
-    prune_type: "group",
+    prune_type: "value",
     group_filtering_kwargs:
       { size_threshold: 3, measure_cutoff: 80, method: "entropy" },
     action_filtering_kwargs:

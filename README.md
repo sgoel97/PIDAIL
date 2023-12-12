@@ -8,9 +8,9 @@
 
 - [alina] Fix filtering logic (currently eliminates groups, should prune groups)
 
-<!-- - [samarth] set up logging to compare pruning vs no pruning -->
+- [samarth] set up logging to compare pruning vs no pruning
 
-<!-- - [samarth] set up consistent randomness -->
+- [samarth] set up consistent randomness
 
 - [Jonathan] alter expert data generation to create good but not great (suboptimal) demos
 
