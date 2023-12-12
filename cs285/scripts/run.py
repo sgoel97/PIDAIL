@@ -43,6 +43,12 @@ discrete_agents = ["dqn", "sqil", "dagger", "bc", "gail", "dqfd"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
 cluster_types = ["agglomerative"]
 prune_types = ["group", "action", "outcome", "value"]
+"""
+group: delete entire groups based on which have the highest variance/entropy
+action: delete FROM groups based on mode action or mean action
+outcome: delete entire groups based on which have the highest variance/entropy amongst future states
+value: delete FROM groups based on best-performing action(s)
+"""
 
 
 def training_loop(
