@@ -113,7 +113,7 @@ def training_loop(
             prune_type in prune_types
         ), f"prune_type config must be one of {prune_types}"
 
-        if prune and prune_type == "outcome":
+        if prune and prune_type in ["outcome", "value"]:
             rollouts = create_imitation_trajectories(expert_file_path, custom=True)
             transitions = Trajectory.flatten_trajectories(rollouts)
         else:
@@ -146,7 +146,7 @@ def training_loop(
                     rollouts, groups, prune_config["outcome_filtering_kwargs"]
                 )
             elif prune_type == "value":
-                filtered_groups = prune_groups_by_value(groups, discrete)
+                filtered_groups = prune_groups_by_value(env, transitions, groups, discrete, prune_config["value_filtering_kwargs"])
             print("\nAfter Filtering:\n############################")
             print_group_stats(filtered_groups)
 

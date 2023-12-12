@@ -29,7 +29,7 @@ cluster_config:
 
 prune_config:
   {
-    prune_type: "outcome",
+    prune_type: "value",
     group_filtering_kwargs:
       {
         size_threshold: 10,
@@ -48,6 +48,10 @@ prune_config:
         horizon: 10,
         metric: "variance",
         cutoff: 90
+      },
+    value_filtering_kwargs:
+      {
+        cutoff: 80
       }
   }
 

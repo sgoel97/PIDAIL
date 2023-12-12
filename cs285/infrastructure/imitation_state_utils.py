@@ -5,6 +5,9 @@ import torch
 from torch.distributions import Categorical
 from sklearn.cluster import AgglomerativeClustering
 
+from stable_baselines3 import DQN, SAC
+from stable_baselines3.common.buffers import ReplayBuffer
+
 from imitation.data.types import TrajectoryWithRew, TransitionsWithRew
 
 from infrastructure.imitation_prune_utils import (
@@ -147,12 +150,48 @@ def prune_transition_groups(transition_groups, discrete, prune_config):
     return valid_transition_groups
 
 
-def prune_groups_by_value(groups, discrete):
+def prune_groups_by_value(env, transitions, groups, discrete, prune_config):
     """
     Calculates Q-values of demonstrated actions
     Gets rid of samples WITHIN a group
     """
-    pass
+    replay_buffer = ReplayBuffer(100000, env.observation_space, env.action_space)
+    for t in transitions:
+        replay_buffer.add(t.obs, t.next_obs, t.action, t.reward, t.done, [])
+    if discrete:
+        q_estimator = DQN(policy = "MlpPolicy", env = env,
+                          exploration_initial_eps = 0.0, exploration_final_eps = 0.0, learning_starts = 0)
+        q_estimator.replay_buffer = replay_buffer
+    else:
+        q_estimator = SAC(policy = "MlpPolicy", env = env, ent_coef = 0.001)
+        q_estimator.replay_buffer = replay_buffer
+    q_estimator.learn(total_timesteps = np.ceil(len(transitions) / q_estimator.batch_size))
+    
+    masks = {}
+    for group in groups:
+        if discrete:
+            best_q_value = float("-inf")
+            best_action = None
+            for transition in group:
+                q_value = q_estimator.policy.forward(transition.obs)
+                if q_value > best_q_value:
+                    best_action = transition.action
+                    best_q_value = q_value
+            include_mask = np.array([t.action == best_action for t in group])
+        else:
+            q_values = []
+            for transition in group:
+                q_value = q_estimator.policy.forward(transition.obs)
+                q_values.append(q_values)
+            threshold = np.percentile(q_values, prune_config["cutoff"])
+            include_mask = np.array(q_values) >= threshold
+        masks[group] = include_mask
+        
+    valid_transition_groups = []
+    for i in range(len(groups)):
+        valid_transitions = [groups[i][j] for j in range(len(groups[i])) if masks[groups[i]][j]]
+        valid_transition_groups.append(valid_transitions)       
+    return valid_transition_groups 
 
 
 def filter_groups_by_outcome(rollouts, groups, prune_config):

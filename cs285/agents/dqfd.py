@@ -32,7 +32,7 @@ class DQfDAgent:
                  start_epsilon = 0.9,
                  end_epsilon = 0.05,
                  epsilon_decay = 1000,
-                 gamma = 0.9,
+                 gamma = 0.95,
                  tau = 100,
                  sample_size = 20,
                  margin = 0.8,
