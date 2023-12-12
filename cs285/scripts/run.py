@@ -348,7 +348,8 @@ def training_loop(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
+    env_choices = ["ant", "cartpole", "cheetah", "hopper", "inv_pend", "lander", "walker"] # alphabetical order now -jg
+    # env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
     agent_choices = discrete_agents + continous_agents
 
     parser.add_argument(

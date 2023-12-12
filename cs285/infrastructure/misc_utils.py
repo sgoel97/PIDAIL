@@ -25,12 +25,14 @@ def to_numpy(tensor):
 
 def get_env(env_name):
     env_mapper = {
-        "cartpole": "CartPole-v1",
         "ant": "Ant-v4",
-        "pendulum": "Pendulum-v1",
+        "cartpole": "CartPole-v1",
+        "cheetah": "HalfCheetah-v4", 
+        "hopper": "Hopper-v4",
         "inv_pend": "InvertedPendulum-v4",
         "lander": "LunarLander-v2",
-        "hopper": "Hopper-v4",
+        "pendulum": "Pendulum-v1",
+        "walker": "Walker-v4", 
     }
     return env_mapper[env_name]
 
