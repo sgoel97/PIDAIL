@@ -78,10 +78,9 @@ def prune_group_mean_action_distance(group, percentile=80):
     assert mean_action.shape == (action_dim, )
 
     action_dists = [np.linalg.norm(action - mean_action) for action in actions]
-    lower_bound = np.percentile(action_dists, 50 - percentile // 2)
-    upper_bound = np.percentile(action_dists, 50 + percentile // 2)
+    upper_bound = np.percentile(action_dists, percentile)
 
-    return [g for g, dist in zip(group, action_dists) if lower_bound <= dist and dist <= upper_bound]
+    return [g for g, dist in zip(group, action_dists) if dist <= upper_bound]
 
 
 def prune_group_vector_action(group, percentile=50):
