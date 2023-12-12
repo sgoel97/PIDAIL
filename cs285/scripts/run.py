@@ -41,7 +41,7 @@ from infrastructure.custom_data_types import *
 
 discrete_agents = ["dqn", "sqil", "dagger", "bc", "gail", "dqfd"]
 continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
-cluster_types = ["agglomerative"]
+cluster_types = ["agglomerative", "kmeans"]
 prune_types = ["group", "action", "outcome", "value"]
 """
 group: delete entire groups based on which have the highest variance/entropy
@@ -58,7 +58,7 @@ def training_loop(
     config,
     agent,
     seed,
-    num_eval_runs=20, 
+    num_eval_runs=20,
     init_weight_file=None,
     timestamp=None,
 ):
@@ -133,9 +133,14 @@ def training_loop(
                 cluster_type in cluster_types
             ), f"cluster_type config must be one of {cluster_types}"
             if cluster_type == "agglomerative":
-                groups = group_transitions(
+                groups = group_transitions_agglomerative(
                     transitions, cluster_config["agglomerative_clustering_kwargs"]
                 )
+            elif cluster_type == "kmeans":
+                groups = group_transitions_kmeans(
+                    transitions, cluster_config["kmeans_clustering_kwargs"]
+                )
+
             print("Before Filtering:\n############################")
             print_group_stats(groups)
 
@@ -152,7 +157,13 @@ def training_loop(
                     rollouts, groups, prune_config["outcome_filtering_kwargs"]
                 )
             elif prune_type == "value":
-                filtered_groups = prune_groups_by_value(env, transitions, groups, discrete, prune_config["value_filtering_kwargs"])
+                filtered_groups = prune_groups_by_value(
+                    env,
+                    transitions,
+                    groups,
+                    discrete,
+                    prune_config["value_filtering_kwargs"],
+                )
             print("\nAfter Filtering:\n############################")
             print_group_stats(filtered_groups)
 
@@ -315,7 +326,9 @@ def training_loop(
 
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
-        avg_eval_return, std_eval_return = agent.evaluate(config["max_steps_per_traj"], n_eval_episodes=num_eval_runs)
+        avg_eval_return, std_eval_return = agent.evaluate(
+            config["max_steps_per_traj"], n_eval_episodes=num_eval_runs
+        )
     else:
         avg_eval_return, std_eval_return = evaluate_policy(
             agent, eval_env, n_eval_episodes=num_eval_runs, deterministic=True
@@ -378,9 +391,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--eval_runs",
-        "-r", 
-        help="number of eval runs", 
-        default=20, 
+        "-r",
+        help="number of eval runs",
+        default=20,
     )
 
     args = parser.parse_args()
@@ -391,7 +404,13 @@ if __name__ == "__main__":
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
 
     total_steps, log_dir = training_loop(
-        args.env_name, args.demos, args.prune, config, agent=args.agent, seed=args.seed, num_eval_runs=int(args.eval_runs)
+        args.env_name,
+        args.demos,
+        args.prune,
+        config,
+        agent=args.agent,
+        seed=args.seed,
+        num_eval_runs=int(args.eval_runs),
     )
 
     plot_npz(log_dir + "/evaluations.npz", log_dir, show=args.graph)
