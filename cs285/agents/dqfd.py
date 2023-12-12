@@ -21,7 +21,7 @@ class WeightedMSE(nn.Module):
         l = torch.tensor(0.0)
         for input, target, weight in zip(inputs, targets, weights):
             error = input - target
-            l += error ** 2 * weight
+            l += error**2 * weight
         return l / weights.shape[0]
 
 
@@ -36,9 +36,9 @@ class DQfDAgent:
                  tau = 100,
                  sample_size = 20,
                  margin = 0.8,
-                 lambda_nstep = 1.0,
-                 lambda_sv = 1.0,
-                 lambda_l2 = 1e-5,
+                 lambda_nstep = 1.0,  # "lambda1"
+                 lambda_sv = 1.0,  # "lambda2"
+                 lambda_l2 = 1e-5,  # "lambda3"
                  n_step = 3):
         # Common variables
         self.env = env
@@ -99,16 +99,18 @@ class DQfDAgent:
                 -1.0 * self.total_steps / self.epsilon_decay
             )
             if prob > eps:
-                with torch.no_grad():
-                    q_values = self.q_net(obs)
-                    action = q_values.argmax().unsqueeze(0)
+                self.q_net.eval()
+                q_values = self.q_net(obs)
+                action = q_values.argmax().unsqueeze(0)
+                self.q_net.train()
             else:
                 action = torch.Tensor([np.random.choice(range(self.num_actions))])
         else:
-            with torch.no_grad():
-                q_values = self.q_net(obs)
-                action = q_values.argmax().unsqueeze(0)
-        return to_numpy(action).squeeze(0).item()
+            self.q_net.eval()
+            q_values = self.q_net(obs)
+            action = q_values.argmax().unsqueeze(0)
+            self.q_net.train()
+        return to_numpy(action).squeeze(0).item()  # revisit: should be [a] ?
     
     def calc_TD(self, samples):
         obs = samples["observations"]
@@ -119,13 +121,15 @@ class DQfDAgent:
         next_obs = samples["next_observations"]
         dones = samples["dones"]
 
+        self.q_net.eval()
         next_q_values = self.q_net(next_obs)
+        self.q_net.train()
         best_actions = next_q_values.argmax(dim = 1)
         target_net_q_values = self.target_net(next_obs)
         target_q_values = torch.gather(target_net_q_values, 1, best_actions.unsqueeze(1)).squeeze(1)
         
-        q_target = torch.Tensor(rewards)
-        q_target[torch.Tensor(dones) != 1] += self.gamma * target_q_values[torch.Tensor(dones) != 1]
+        q_target = torch.tensor(rewards)
+        q_target[torch.tensor(dones) != 1] += self.gamma * target_q_values[torch.tensor(dones) != 1]
         q_net_q_values = self.q_net(obs)
         q_predict = torch.gather(q_net_q_values, 1, actions.unsqueeze(1)).squeeze(1)
         return q_predict, q_target
@@ -140,7 +144,9 @@ class DQfDAgent:
         for i in range(len(obs)):
             if demo_infos[i] is None:
                 continue
+            self.q_net.eval()
             best_actions_desc = torch.argsort(self.q_net(obs[i]), descending = True)
+            self.q_net.train()
             if len(best_actions_desc) == 1:
                 continue
             q_expert = self.q_net(obs[i])[actions[i]]
@@ -155,13 +161,11 @@ class DQfDAgent:
         return loss / num_demos if num_demos != 0 else loss
     
     def calc_Jn(self, samples, q_predict):
-        obs = samples["observations"]
-        next_obs = samples["next_observations"]
         demo_infos = samples["demo_infos"]
 
         loss = torch.tensor(0.0)
         num_demos = 0
-        for i in range(len(obs)):
+        for i in range(len(demo_infos)):
             if demo_infos[i] is None:
                 continue
             demo_idx, idx = demo_infos[i]
@@ -171,16 +175,25 @@ class DQfDAgent:
                 continue
             num_demos += 1
             d_obs, d_act, d_rew, d_next_obs, d_done, _ = zip(*self.demo_replay[demo_idx][idx : n_idx])
+            print("SJDKFFJLKSFJKLJLKS")
+            print(d_obs)
+            print(d_act)
+            print(d_rew)
+            print(d_next_obs)
+            print(d_done)
+            print("&&&&&&&")
             d_obs = d_obs[-1]
             d_act = d_act[-1]
             d_next_obs = d_next_obs[-1]
             d_done = d_done[-1]
-            discounted_reward = reduce(lambda x, y: (x[0] + self.gamma ** x[1] * y, x[1] + 1), d_rew, (0, 0))[0]
-            best_action = torch.argmax(self.q_net(next_obs))
+            discounted_reward = reduce(lambda x, y: (x[0] + self.gamma**x[1] * y, x[1] + 1), d_rew, (0, 0))[0]
+            self.q_net.eval()
+            best_action = torch.argmax(self.q_net(d_next_obs))
+            self.q_net.train()
             if d_done:
                 target = discounted_reward
             else:
-                q_value = torch.gather(self.target_net(next_obs), 1, best_action.unsqueeze(1)).squeeze(1)
+                q_value = torch.gather(self.target_net(d_next_obs), 1, best_action.unsqueeze(1)).squeeze(1)
                 target = discounted_reward + self.gamma ** self.n_step * q_value
             pred = q_predict[i]
             loss += (target - pred) ** 2
@@ -193,16 +206,15 @@ class DQfDAgent:
         for i in range(self.sample_size):
             error = math.fabs(float(q_predict[i] - q_target[i]))
             self.prb.update(indices[i], error)
-        J_TD = self.q_loss_fn(q_predict, q_target, weights)
+        J_TD = self.q_loss_fn(q_predict, q_target, weights)  # revisit: should just be 1?
         J_E = self.calc_JE(samples)
-        Jn = self.calc_Jn(samples, q_predict)
-        total_loss = J_TD + self.lambda_sv * J_E + self.lambda_nstep * Jn
+        J_n = self.calc_Jn(samples, q_predict)
+        total_loss = J_TD + self.lambda_sv * J_E + self.lambda_nstep * J_n
         total_loss.backward()
         self.q_optimizer.step()
         if self.total_steps % self.tau == 0:
             self.target_net.load_state_dict(self.q_net.state_dict())
-        else:
-            self.total_steps += 1
+        self.total_steps += 1
 
     def set_log_dir(self, log_dir):
         if not os.path.exists(log_dir + "/"):
@@ -220,18 +232,20 @@ class DQfDAgent:
             self.insert_demo_transition(t["obs"], t["acts"], t["rews"], t["next_obs"], t["dones"], i)
         self.prb.sum_tree.start = start
         # Pretrain on demos
+        print("Pretraining on demos")
         pretrain_range = range(self.pretrain_steps)
         if progress_bar:
             pretrain_range = tqdm(pretrain_range)
-        for i in pretrain_range:
+        for _ in pretrain_range:
             self.update()
             pretrain_and_train_rewards.append(0)
         # Train DQN
+        print("Training DQN")
         obs, _ = self.env.reset()
         train_range = range(total_steps - self.pretrain_steps)
         if progress_bar:
             train_range = tqdm(train_range)
-        for i in train_range:
+        for _ in train_range:
             action = int(self.get_action(obs))
             next_obs, reward, done, truncated, _ = self.env.step(action)
             pretrain_and_train_rewards.append(reward)
@@ -246,17 +260,20 @@ class DQfDAgent:
         plt.title("Pretraining/Training Returns")
         plt.savefig(self.log_dir + "train_returns.png")
     
-    def evaluate(self, n_eval_episodes = 10):
+    def evaluate(self, max_steps, n_eval_episodes = 10):
         obs, _ = self.env.reset()
         eval_returns = []
-        for _ in range(n_eval_episodes):
+        for i in range(n_eval_episodes):
             total_returns = 0
+            num_steps = 0
             done = False
-            while not done:
+            while (not done) and (num_steps < max_steps):
                 action = int(self.get_action(obs, greedy = False))
                 next_obs, reward, done, _, _ = self.env.step(action)
                 total_returns += reward
                 obs = next_obs
+                num_steps += 1
             obs, _ = self.env.reset()
             eval_returns.append(total_returns)
+            print(f"Eval ep {i} achieved {total_returns}")
         return np.mean(eval_returns), np.std(eval_returns)

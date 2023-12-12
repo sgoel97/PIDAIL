@@ -309,7 +309,7 @@ def training_loop(
 
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
-        avg_eval_return, std_eval_return = agent.evaluate(n_eval_episodes=num_eval_runs)
+        avg_eval_return, std_eval_return = agent.evaluate(config["max_steps_per_traj"], n_eval_episodes=num_eval_runs)
     else:
         avg_eval_return, std_eval_return = evaluate_policy(
             agent, eval_env, n_eval_episodes=num_eval_runs, deterministic=True

@@ -58,7 +58,7 @@ class ReplayBuffer:
 
 
 class PrioritizedReplayBuffer:  # FIXME: could make it extend from ReplayBuffer somehow?
-    e = 0.0
+    e = 0.0  # revisit
     a = 0.6
     beta = 0.0
     beta_inc = 0.001
@@ -163,8 +163,8 @@ class SumTree:
         self.propagate(idx, delta)
     
     def get(self, s):
-        idx = self.retrieve(0, s)
-        data_idx = idx - self.capacity + 1
+        tree_idx = self.retrieve(0, s)
+        data_idx = tree_idx - self.capacity + 1
         data = {
             "observations": self.observations[data_idx],
             "actions": self.actions[data_idx],
@@ -173,4 +173,16 @@ class SumTree:
             "dones": self.dones[data_idx],
             "demo_infos": self.demo_infos[data_idx]
         }
-        return idx, self.tree[idx], data
+        return tree_idx, self.tree[tree_idx], data
+
+
+if __name__ == "__main__":
+    # Testing PRB
+    prb = PrioritizedReplayBuffer(10)
+    prb.insert([21], 0, 10, [42], True, None, 1)
+    prb.insert([42], 1, 20, [69], True, None, 10)
+    prb.insert([69], 2, 30, [420], True, None, 100)
+    data, idx, _ = prb.sample(2)
+    print(prb.sample(5)[2])
+    prb.update(11, 0)
+    print(prb.sample(5)[2])
