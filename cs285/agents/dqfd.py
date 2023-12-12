@@ -175,13 +175,6 @@ class DQfDAgent:
                 continue
             num_demos += 1
             d_obs, d_act, d_rew, d_next_obs, d_done, _ = zip(*self.demo_replay[demo_idx][idx : n_idx])
-            print("SJDKFFJLKSFJKLJLKS")
-            print(d_obs)
-            print(d_act)
-            print(d_rew)
-            print(d_next_obs)
-            print(d_done)
-            print("&&&&&&&")
             d_obs = d_obs[-1]
             d_act = d_act[-1]
             d_next_obs = d_next_obs[-1]
