@@ -339,28 +339,32 @@ def training_loop(
 
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
-        avg_eval_return, std_eval_return, ep_len = agent.evaluate(
+        eval_return, _, ep_len = agent.evaluate(
             config["max_steps_per_traj"],
             n_eval_episodes=num_eval_runs,
             new_env=dqfd_eval_env,
         )
     else:
-        avg_eval_returns, ep_len = evaluate_policy(
+        eval_return, ep_len = evaluate_policy(
             agent,
             eval_env,
             n_eval_episodes=num_eval_runs,
             deterministic=True,
             return_episode_rewards=True,
         )
-    eval_returns.append(avg_eval_returns)
+    eval_returns.append(eval_return)
     episode_lengths.append(ep_len)
 
     if agent_name in ["bc", "gail", "dqfd"]:
         np.savez_compressed(
             log_dir + "/evaluations", results=eval_returns, ep_lengths=episode_lengths
         )
-    print("avg. eval return:", avg_eval_return)
-    print("std. eval return:", std_eval_return)
+    print("Final avg. eval return:", eval_returns[-1])
+    print("Final avg. episode length:", episode_lengths[-1])
+    print("Overall avg. eval return:", np.mean(eval_returns))
+    print("Overall std. eval return:", np.std(eval_returns))
+    print("Overall avg. epsiode length:", np.mean(episode_lengths))
+    print("Overall std. episode length:", np.std(episode_lengths))
 
     env.close()
     eval_env.close()
