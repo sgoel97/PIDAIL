@@ -19,7 +19,7 @@ dqn:
 
 cluster_config:
   {
-    cluster_type: "kmeans",
+    cluster_type: "agglomerative",
     agglomerative_clustering_kwargs:
       { metric: "l2", linkage: "average", distance_threshold: 0.2 },
     kmeans_clustering_kwargs:

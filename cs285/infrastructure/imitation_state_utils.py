@@ -200,7 +200,11 @@ def prune_groups_by_value(env, transitions, groups, discrete, prune_config):
         )
         q_estimator.replay_buffer = replay_buffer
     else:
-        q_estimator = SAC(policy="MlpPolicy", env=env, ent_coef=0.001)
+        q_estimator = SAC(policy="MlpPolicy",
+                          env=env,
+                          ent_coef=0.0,
+                          learning_starts=0
+        )
         q_estimator.replay_buffer = replay_buffer
     q_estimator.learn(
         total_timesteps=np.ceil(len(transitions) / q_estimator.batch_size)

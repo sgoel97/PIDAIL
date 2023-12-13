@@ -10,7 +10,7 @@ from infrastructure.plotting_utils import *
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
-    agent_choices = ["bc", "sqil", "gail"]
+    agent_choices = ["bc", "sqil", "gail", "dqfd"]
 
     parser.add_argument(
         "--env_name",
