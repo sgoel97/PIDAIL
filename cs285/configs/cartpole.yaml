@@ -28,7 +28,7 @@ cluster_config:
 
 prune_config:
   {
-    prune_type: "outcome",
+    prune_type: "group",
     group_filtering_kwargs:
       { size_threshold: 10, measure_cutoff: 80, method: "variance" },
     action_filtering_kwargs:

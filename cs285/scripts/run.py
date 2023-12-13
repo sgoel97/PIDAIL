@@ -339,21 +339,21 @@ def training_loop(
 
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
-        avg_eval_return, std_eval_return, _ = agent.evaluate(
+        avg_eval_return, std_eval_return, ep_len = agent.evaluate(
             config["max_steps_per_traj"],
             n_eval_episodes=num_eval_runs,
             new_env=dqfd_eval_env,
         )
     else:
-        avg_eval_returns, episode_lengths = evaluate_policy(
+        avg_eval_returns, ep_len = evaluate_policy(
             agent,
             eval_env,
             n_eval_episodes=num_eval_runs,
             deterministic=True,
             return_episode_rewards=True,
         )
-        eval_returns.append(avg_eval_returns)
-        episode_lengths.append(episode_lengths)
+    eval_returns.append(avg_eval_returns)
+    episode_lengths.append(ep_len)
 
     if agent_name in ["bc", "gail", "dqfd"]:
         np.savez_compressed(
