@@ -330,9 +330,17 @@ def training_loop(
             config["max_steps_per_traj"], n_eval_episodes=num_eval_runs
         )
     else:
-        avg_eval_return, std_eval_return = evaluate_policy(
-            agent, eval_env, n_eval_episodes=num_eval_runs, deterministic=True
+        avg_eval_returns, episode_lengths = evaluate_policy(
+            agent,
+            eval_env,
+            n_eval_episodes=num_eval_runs,
+            deterministic=True,
+            return_episode_rewards=True,
         )
+
+        eval_returns.append(avg_eval_returns)
+        episode_lengths.append(episode_lengths)
+
     if agent_name == "bc" or agent_name == "gail":
         np.savez_compressed(
             log_dir + "/evaluations", results=eval_returns, ep_lengths=episode_lengths
