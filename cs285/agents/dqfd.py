@@ -259,7 +259,7 @@ class DQfDAgent:
             next_obs, reward, done, truncated, _ = self.env.step(action)
             curr_steps += 1
             if progress_bar:
-                    pbar.update(1)
+                pbar.update(1)
             total_returns += reward
             self.insert_own_transition(obs, action, reward, next_obs, done and not truncated)
             self.update()
