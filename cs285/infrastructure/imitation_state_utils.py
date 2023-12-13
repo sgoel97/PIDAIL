@@ -27,7 +27,7 @@ def create_imitation_trajectories(expert_file_path, custom=False):
     for demo in demos:
         if custom:
             trajectory = Trajectory()
-            for i in range(len(demo) - 1):
+            for i in range(len(demo["observation"]) - 1):
                 trajectory.transitions.append(
                     Transition(
                         demo["observation"][i],
@@ -290,12 +290,12 @@ def collate_transitions(transition_groups):
     for group in transition_groups:
         transitions.extend(group)
 
-    observations = np.array([t["obs"] for t in transitions])
-    actions = np.array([t["acts"] for t in transitions])
-    infos = np.array([t["infos"] for t in transitions])
-    next_observations = np.array([t["next_obs"] for t in transitions])
-    dones = np.array([t["dones"] for t in transitions])
-    rewards = np.array([t["rews"] for t in transitions])
+    observations = np.array([t.obs if isinstance(t, Transition) else t["obs"] for t in transitions])
+    actions = np.array([t.action if isinstance(t, Transition) else t["acts"] for t in transitions])
+    infos = np.array([None if isinstance(t, Transition) else t["infos"] for t in transitions])
+    next_observations = np.array([t.next_obs if isinstance(t, Transition) else t["next_obs"] for t in transitions])
+    dones = np.array([t.done if isinstance(t, Transition) else t["dones"] for t in transitions])
+    rewards = np.array([t.reward if isinstance(t, Transition) else t["rews"] for t in transitions])
 
     transitions = TransitionsWithRew(
         observations, actions, infos, next_observations, dones, rewards

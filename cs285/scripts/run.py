@@ -313,27 +313,33 @@ def training_loop(
         if agent_name == "dqfd":
             agent = DQfDAgent(gym.make(gym_env_name))
             agent.set_log_dir(log_dir)
-            agent.learn(total_steps, transitions, progress_bar=True)
+            def evaluate():
+                eval_return, _, ep_lens = agent.evaluate(config["max_steps_per_traj"],
+                                                         n_eval_episodes=num_eval_runs,
+                                                         eval=False)
+                eval_returns.append(eval_return)
+                episode_lengths.append(ep_lens)
+            agent.train(total_steps, transitions, progress_bar=True, callback=evaluate)
 
     else:
         agent = get_agent(agent_name, env, config)
         if isinstance(agent, DQfDAgent):
             agent.set_log_dir(log_dir)
-            agent.learn(total_steps, transitions, progress_bar=True)
+            agent.train(total_steps, transitions, progress_bar=True, callback=evaluate)
         else:
             agent.set_logger(logger)
             agent.learn(total_steps, callback=eval_callback, progress_bar=True)
 
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
-        avg_eval_return, std_eval_return = agent.evaluate(
-            config["max_steps_per_traj"], n_eval_episodes=num_eval_runs
+        avg_eval_return, std_eval_return, _ = agent.evaluate(
+            config["max_steps_per_traj"], n_eval_episodes=num_eval_runs,
         )
     else:
         avg_eval_return, std_eval_return = evaluate_policy(
             agent, eval_env, n_eval_episodes=num_eval_runs, deterministic=True
         )
-    if agent_name == "bc" or agent_name == "gail":
+    if agent_name in ["bc", "gail", "dqfd"]:
         np.savez_compressed(
             log_dir + "/evaluations", results=eval_returns, ep_lengths=episode_lengths
         )
@@ -343,7 +349,7 @@ def training_loop(
     env.close()
     eval_env.close()
 
-    return total_steps, imitation_logger.get_dir()
+    return total_steps, log_dir
 
 
 if __name__ == "__main__":

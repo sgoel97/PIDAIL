@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from datetime import timedelta
 
 import torch
 
@@ -60,3 +61,8 @@ def save_networks(using_demos, prune, env_name, agent):
         agent.actor.save(data_path / "actor.pt")
 
     return data_path
+
+
+def format_time(secs):
+    td = tiemdelta(seconds = secs)
+    return str(td)
