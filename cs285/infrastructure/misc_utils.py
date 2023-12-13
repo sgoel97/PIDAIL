@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from datetime import timedelta
 
 import torch
 
@@ -25,12 +26,14 @@ def to_numpy(tensor):
 
 def get_env(env_name):
     env_mapper = {
-        "cartpole": "CartPole-v1",
         "ant": "Ant-v4",
-        "pendulum": "Pendulum-v1",
+        "cartpole": "CartPole-v1",
+        "cheetah": "HalfCheetah-v4", 
+        "hopper": "Hopper-v4",
         "inv_pend": "InvertedPendulum-v4",
         "lander": "LunarLander-v2",
-        "hopper": "Hopper-v4",
+        "pendulum": "Pendulum-v1",
+        "walker": "Walker-v4", 
     }
     return env_mapper[env_name]
 
@@ -58,3 +61,8 @@ def save_networks(using_demos, prune, env_name, agent):
         agent.actor.save(data_path / "actor.pt")
 
     return data_path
+
+
+def format_time(secs):
+    td = tiemdelta(seconds = secs)
+    return str(td)

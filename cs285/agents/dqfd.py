@@ -11,6 +11,7 @@ from functools import reduce
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
+import time
 
 
 class WeightedMSE(nn.Module):
@@ -70,8 +71,10 @@ class DQfDAgent:
         self.q_loss_fn = WeightedMSE()
         self.lr_schedule = optim.lr_scheduler.ConstantLR(self.q_optimizer, factor = 1.0)
     
+    
     def sample_from_replay(self):
         return self.prb.sample(self.sample_size)
+    
     
     def insert_demo_transition(self, obs, action, reward, next_obs, done, demo_idx):
         if type(obs) != torch.Tensor:
@@ -83,12 +86,14 @@ class DQfDAgent:
         self.prb.insert(obs, action, reward, next_obs, done, (demo_idx, idx))
         episode_replay.append((obs, action, reward, next_obs, done, (demo_idx, idx)))
     
+    
     def insert_own_transition(self, obs, action, reward, next_obs, done):
         if type(obs) != torch.Tensor:
             obs = from_numpy(obs)
         if type(next_obs) != torch.Tensor:
             next_obs = from_numpy(next_obs)
         self.prb.insert(obs, action, reward, next_obs, done, None)
+    
     
     def get_action(self, obs, greedy = True):
         if type(obs) != torch.Tensor:
@@ -112,6 +117,7 @@ class DQfDAgent:
             self.q_net.train()
         return to_numpy(action).squeeze(0).item()  # revisit: should be [a] ?
     
+    
     def calc_TD(self, samples):
         obs = samples["observations"]
         actions = samples["actions"]
@@ -133,6 +139,7 @@ class DQfDAgent:
         q_net_q_values = self.q_net(obs)
         q_predict = torch.gather(q_net_q_values, 1, actions.unsqueeze(1)).squeeze(1)
         return q_predict, q_target
+    
     
     def calc_JE(self, samples):
         obs = samples["observations"]
@@ -159,6 +166,7 @@ class DQfDAgent:
                 loss += q_value - q_expert
                 num_demos += 1
         return loss / num_demos if num_demos != 0 else loss
+    
     
     def calc_Jn(self, samples, q_predict):
         demo_infos = samples["demo_infos"]
@@ -192,6 +200,7 @@ class DQfDAgent:
             loss += (target - pred) ** 2
         return loss / num_demos
     
+    
     def update(self):
         self.q_optimizer.zero_grad()
         samples, indices, weights = self.sample_from_replay()
@@ -209,14 +218,17 @@ class DQfDAgent:
             self.target_net.load_state_dict(self.q_net.state_dict())
         self.total_steps += 1
 
+    
     def set_log_dir(self, log_dir):
         if not os.path.exists(log_dir + "/"):
             os.makedirs(log_dir + "/")
         self.log_dir = log_dir + "/"
     
-    def learn(self, total_steps, transitions, progress_bar = False):
+    
+    def train(self, total_steps, transitions, progress_bar = False, callback = None):
         assert total_steps >= 2 * self.pretrain_steps, f"Total train steps must be at least twice pretrain steps ({self.pretrain_steps})"
-        pretrain_and_train_rewards = []
+        train_returns = []
+        
         # Store demo transitions
         start = 0
         for i in range(len(transitions)):
@@ -224,6 +236,7 @@ class DQfDAgent:
             t = transitions[i]
             self.insert_demo_transition(t["obs"], t["acts"], t["rews"], t["next_obs"], t["dones"], i)
         self.prb.sum_tree.start = start
+        
         # Pretrain on demos
         print("Pretraining on demos")
         pretrain_range = range(self.pretrain_steps)
@@ -231,42 +244,60 @@ class DQfDAgent:
             pretrain_range = tqdm(pretrain_range)
         for _ in pretrain_range:
             self.update()
-            pretrain_and_train_rewards.append(0)
+        
         # Train DQN
         print("Training DQN")
+        train_start_time = time.time()
         obs, _ = self.env.reset()
-        train_range = range(total_steps - self.pretrain_steps)
-        if progress_bar:
-            train_range = tqdm(train_range)
-        for _ in train_range:
+        leftover_steps = total_steps - self.pretrain_steps
+        curr_steps = 0
+        total_returns = 0
+        while curr_steps < leftover_steps:
             action = int(self.get_action(obs))
             next_obs, reward, done, truncated, _ = self.env.step(action)
-            pretrain_and_train_rewards.append(reward)
+            curr_steps += 1
+            total_returns += reward
             self.insert_own_transition(obs, action, reward, next_obs, done and not truncated)
             self.update()
             if done:
                 obs, _ = self.env.reset()
+                train_returns.append(total_returns)
+                total_returns = 0
+                if progress_bar:
+                    print(f"Training: {round(curr_steps / leftover_steps * 100, 2)}%, time elapsed: {format_time(time.time() - train_start_time)}", end = "\r")
+                if callback:
+                    callback()
             else:
                 obs = next_obs
+        
         # Save training rewards
-        plt.plot(range(len(pretrain_and_train_rewards)), pretrain_and_train_rewards)
+        plt.plot(range(len(train_returns)), train_returns)
         plt.title("Pretraining/Training Returns")
         plt.savefig(self.log_dir + "train_returns.png")
     
-    def evaluate(self, max_steps, n_eval_episodes = 10):
-        obs, _ = self.env.reset()
+    
+    def evaluate(self, max_steps, n_eval_episodes = 20, new_env = None, eval = True):
+        using_env = new_env if new_env else self.env
+        obs, _ = using_env.reset()
         eval_returns = []
-        for i in range(n_eval_episodes):
+        all_num_steps = []
+        print("Evaluating")
+        for _ in tqdm(range(n_eval_episodes)):
             total_returns = 0
             num_steps = 0
             done = False
             while (not done) and (num_steps < max_steps):
                 action = int(self.get_action(obs, greedy = False))
-                next_obs, reward, done, _, _ = self.env.step(action)
+                next_obs, reward, done, _, _ = using_env.step(action)
                 total_returns += reward
                 obs = next_obs
                 num_steps += 1
-            obs, _ = self.env.reset()
+            obs, _ = using_env.reset()
             eval_returns.append(total_returns)
-            print(f"Eval ep {i} achieved {total_returns}")
-        return np.mean(eval_returns), np.std(eval_returns)
+            all_num_steps.append(num_steps)
+        
+        if eval:
+            plt.plot(range(len(eval_returns)), eval_returns)
+            plt.title("Evaluation Returns")
+            plt.savefig(self.log_dir + "eval_returns.png")
+        return np.mean(eval_returns), np.std(eval_returns), np.mean(all_num_steps)
