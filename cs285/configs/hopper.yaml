@@ -1,5 +1,7 @@
 total_steps: 100000
+dqfd_pretrain_steps: 20000
 discrete: True
+max_steps_per_traj: 1000
 
 dqn: { learning_starts: 10000 }
 

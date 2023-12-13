@@ -1,4 +1,5 @@
 total_steps: 20000
+dqfd_pretrain_steps: 10000
 discrete: True
 max_steps_per_traj: 500
 

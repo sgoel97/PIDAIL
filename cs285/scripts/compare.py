@@ -24,7 +24,7 @@ if __name__ == "__main__":
         "--graph",
         "-g",
         action="store_true",
-        help="Whether or not to graph results",
+        help="Whether or not to show graph of results",
     )
 
     parser.add_argument(

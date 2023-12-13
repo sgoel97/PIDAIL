@@ -63,7 +63,7 @@ class PrioritizedReplayBuffer:  # FIXME: could make it extend from ReplayBuffer 
     beta = 0.0
     beta_inc = 0.001
 
-    def __init__(self, capacity = 10000):
+    def __init__(self, capacity = 1000000):
         self.sum_tree = SumTree(capacity)
         self.capacity = capacity
     
@@ -111,7 +111,7 @@ class PrioritizedReplayBuffer:  # FIXME: could make it extend from ReplayBuffer 
 class SumTree:
     write = 0
 
-    def __init__(self, capacity = 10000):
+    def __init__(self, capacity = 1000000):
         self.capacity = capacity
         self.curr_size = 0
         self.start = 0

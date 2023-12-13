@@ -252,10 +252,14 @@ class DQfDAgent:
         leftover_steps = total_steps - self.pretrain_steps
         curr_steps = 0
         total_returns = 0
+        if progress_bar:
+            pbar = tqdm(total = leftover_steps)
         while curr_steps < leftover_steps:
             action = int(self.get_action(obs))
             next_obs, reward, done, truncated, _ = self.env.step(action)
             curr_steps += 1
+            if progress_bar:
+                    pbar.update(1)
             total_returns += reward
             self.insert_own_transition(obs, action, reward, next_obs, done and not truncated)
             self.update()
@@ -263,12 +267,12 @@ class DQfDAgent:
                 obs, _ = self.env.reset()
                 train_returns.append(total_returns)
                 total_returns = 0
-                if progress_bar:
-                    print(f"Training: {round(curr_steps / leftover_steps * 100, 2)}%, time elapsed: {format_time(time.time() - train_start_time)}", end = "\r")
                 if callback:
                     callback()
             else:
                 obs = next_obs
+        if progress_bar:
+            pbar.close()
         
         # Save training rewards
         plt.plot(range(len(train_returns)), train_returns)
@@ -281,7 +285,6 @@ class DQfDAgent:
         obs, _ = using_env.reset()
         eval_returns = []
         all_num_steps = []
-        print("Evaluating")
         for _ in tqdm(range(n_eval_episodes)):
             total_returns = 0
             num_steps = 0
@@ -300,4 +303,4 @@ class DQfDAgent:
             plt.plot(range(len(eval_returns)), eval_returns)
             plt.title("Evaluation Returns")
             plt.savefig(self.log_dir + "eval_returns.png")
-        return np.mean(eval_returns), np.std(eval_returns), np.mean(all_num_steps)
+        return eval_returns, np.std(eval_returns), all_num_steps

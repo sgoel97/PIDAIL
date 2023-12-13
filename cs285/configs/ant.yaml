@@ -1,5 +1,7 @@
 total_steps: 50000
+dqfd_pretrain_steps: 10000
 discrete: False
+max_steps_per_traj: 1000
 
 sac: { learning_starts: 10000, use_sde: false }
 

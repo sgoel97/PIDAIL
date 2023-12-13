@@ -7,3 +7,5 @@ tqdm
 stable-baselines3[extra]
 imitation[extra]
 rl_zoo3[extra]
+huggingface-sb3
+scikit-learn

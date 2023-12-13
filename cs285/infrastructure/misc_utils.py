@@ -64,5 +64,5 @@ def save_networks(using_demos, prune, env_name, agent):
 
 
 def format_time(secs):
-    td = tiemdelta(seconds = secs)
+    td = timedelta(seconds = secs)
     return str(td)

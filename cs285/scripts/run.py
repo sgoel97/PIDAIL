@@ -143,8 +143,8 @@ def training_loop(
                     transitions, cluster_config["kmeans_clustering_kwargs"]
                 )
 
-            print("Before Filtering:\n############################")
-            print_group_stats(groups)
+            # print("Before Filtering:\n############################")
+            # print_group_stats(groups)
 
             if prune_type == "group":
                 filtered_groups = filter_transition_groups(
@@ -160,14 +160,14 @@ def training_loop(
                 )
             elif prune_type == "value":
                 filtered_groups = prune_groups_by_value(
-                    env,
+                    dqfd_train_env,
                     transitions,
                     groups,
                     discrete,
                     prune_config["value_filtering_kwargs"],
                 )
-            print("\nAfter Filtering:\n############################")
-            print_group_stats(filtered_groups)
+            # print("After Filtering:\n############################")
+            # print_group_stats(filtered_groups)
 
             transitions = collate_transitions(filtered_groups)
 
@@ -313,7 +313,7 @@ def training_loop(
             agent = gail_trainer.policy
 
         if agent_name == "dqfd":
-            agent = DQfDAgent(dqfd_train_env)
+            agent = DQfDAgent(dqfd_train_env, pretrain_steps=config["dqfd_pretrain_steps"])
             agent.set_log_dir(log_dir)
 
             def evaluate():
@@ -369,6 +369,7 @@ def training_loop(
     print("Overall std. eval return:", np.std(eval_returns))
     print("Overall avg. epsiode length:", np.mean(episode_lengths))
     print("Overall std. episode length:", np.std(episode_lengths))
+    print()
 
     env.close()
     eval_env.close()
