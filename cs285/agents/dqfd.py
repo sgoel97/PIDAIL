@@ -227,7 +227,7 @@ class DQfDAgent:
     
     def train(self, total_steps, transitions, progress_bar = False, callback = None):
         assert total_steps >= 2 * self.pretrain_steps, f"Total train steps must be at least twice pretrain steps ({self.pretrain_steps})"
-        pretrain_and_train_rewards = []
+        train_returns = []
         
         # Store demo transitions
         start = 0
@@ -244,7 +244,6 @@ class DQfDAgent:
             pretrain_range = tqdm(pretrain_range)
         for _ in pretrain_range:
             self.update()
-            pretrain_and_train_rewards.append(0)
         
         # Train DQN
         print("Training DQN")
@@ -252,15 +251,18 @@ class DQfDAgent:
         obs, _ = self.env.reset()
         leftover_steps = total_steps - self.pretrain_steps
         curr_steps = 0
+        total_returns = 0
         while curr_steps < leftover_steps:
             action = int(self.get_action(obs))
             next_obs, reward, done, truncated, _ = self.env.step(action)
             curr_steps += 1
-            pretrain_and_train_rewards.append(reward)
+            total_returns += reward
             self.insert_own_transition(obs, action, reward, next_obs, done and not truncated)
             self.update()
             if done:
                 obs, _ = self.env.reset()
+                train_returns.append(total_returns)
+                total_returns = 0
                 if progress_bar:
                     print(f"Training: {round(curr_steps / leftover_steps * 100, 2)}%, time elapsed: {format_time(time.time() - train_start_time)}", end = "\r")
                 if callback:
@@ -269,13 +271,14 @@ class DQfDAgent:
                 obs = next_obs
         
         # Save training rewards
-        plt.plot(range(len(pretrain_and_train_rewards)), pretrain_and_train_rewards)
+        plt.plot(range(len(train_returns)), train_returns)
         plt.title("Pretraining/Training Returns")
         plt.savefig(self.log_dir + "train_returns.png")
     
     
-    def evaluate(self, max_steps, n_eval_episodes = 20, eval = True):
-        obs, _ = self.env.reset()
+    def evaluate(self, max_steps, n_eval_episodes = 20, new_env = None, eval = True):
+        using_env = new_env if new_env else self.env
+        obs, _ = using_env.reset()
         eval_returns = []
         all_num_steps = []
         print("Evaluating")
@@ -285,11 +288,11 @@ class DQfDAgent:
             done = False
             while (not done) and (num_steps < max_steps):
                 action = int(self.get_action(obs, greedy = False))
-                next_obs, reward, done, _, _ = self.env.step(action)
+                next_obs, reward, done, _, _ = using_env.step(action)
                 total_returns += reward
                 obs = next_obs
                 num_steps += 1
-            obs, _ = self.env.reset()
+            obs, _ = using_env.reset()
             eval_returns.append(total_returns)
             all_num_steps.append(num_steps)
         

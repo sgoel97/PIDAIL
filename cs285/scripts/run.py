@@ -82,6 +82,8 @@ def training_loop(
         rng=rng,
         post_wrappers=[lambda env, _: RolloutInfoWrapper(env)],
     )
+    dqfd_train_env = gym.make(gym_env_name)
+    dqfd_eval_env = gym.make(gym_env_name)
 
     # Set up defaults
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
@@ -311,12 +313,13 @@ def training_loop(
             agent = gail_trainer.policy
 
         if agent_name == "dqfd":
-            agent = DQfDAgent(gym.make(gym_env_name))
+            agent = DQfDAgent(dqfd_train_env)
             agent.set_log_dir(log_dir)
             def evaluate():
                 eval_return, _, ep_lens = agent.evaluate(config["max_steps_per_traj"],
                                                          n_eval_episodes=num_eval_runs,
-                                                         eval=False)
+                                                         eval=False,
+                                                         new_env=dqfd_eval_env)
                 eval_returns.append(eval_return)
                 episode_lengths.append(ep_lens)
             agent.train(total_steps, transitions, progress_bar=True, callback=evaluate)
@@ -333,7 +336,7 @@ def training_loop(
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
         avg_eval_return, std_eval_return, _ = agent.evaluate(
-            config["max_steps_per_traj"], n_eval_episodes=num_eval_runs,
+            config["max_steps_per_traj"], n_eval_episodes=num_eval_runs, new_env=dqfd_eval_env
         )
     else:
         avg_eval_return, std_eval_return = evaluate_policy(
