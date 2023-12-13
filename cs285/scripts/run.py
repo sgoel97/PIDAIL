@@ -359,6 +359,10 @@ def training_loop(
         np.savez_compressed(
             log_dir + "/evaluations", results=eval_returns, ep_lengths=episode_lengths
         )
+    if prune:
+        print("PRUNED RESULTS")
+    else:
+        print("UNPRUNED RESULTS")
     print("Final avg. eval return:", eval_returns[-1])
     print("Final avg. episode length:", episode_lengths[-1])
     print("Overall avg. eval return:", np.mean(eval_returns))
