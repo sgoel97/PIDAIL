@@ -315,13 +315,17 @@ def training_loop(
         if agent_name == "dqfd":
             agent = DQfDAgent(dqfd_train_env)
             agent.set_log_dir(log_dir)
+
             def evaluate():
-                eval_return, _, ep_lens = agent.evaluate(config["max_steps_per_traj"],
-                                                         n_eval_episodes=num_eval_runs,
-                                                         eval=False,
-                                                         new_env=dqfd_eval_env)
+                eval_return, _, ep_lens = agent.evaluate(
+                    config["max_steps_per_traj"],
+                    n_eval_episodes=num_eval_runs,
+                    eval=False,
+                    new_env=dqfd_eval_env,
+                )
                 eval_returns.append(eval_return)
                 episode_lengths.append(ep_lens)
+
             agent.train(total_steps, transitions, progress_bar=True, callback=evaluate)
 
     else:
@@ -336,12 +340,21 @@ def training_loop(
     # Evaluate at end
     if isinstance(agent, DQfDAgent):
         avg_eval_return, std_eval_return, _ = agent.evaluate(
-            config["max_steps_per_traj"], n_eval_episodes=num_eval_runs, new_env=dqfd_eval_env
+            config["max_steps_per_traj"],
+            n_eval_episodes=num_eval_runs,
+            new_env=dqfd_eval_env,
         )
     else:
-        avg_eval_return, std_eval_return = evaluate_policy(
-            agent, eval_env, n_eval_episodes=num_eval_runs, deterministic=True
+        avg_eval_returns, episode_lengths = evaluate_policy(
+            agent,
+            eval_env,
+            n_eval_episodes=num_eval_runs,
+            deterministic=True,
+            return_episode_rewards=True,
         )
+        eval_returns.append(avg_eval_returns)
+        episode_lengths.append(episode_lengths)
+
     if agent_name in ["bc", "gail", "dqfd"]:
         np.savez_compressed(
             log_dir + "/evaluations", results=eval_returns, ep_lengths=episode_lengths
@@ -357,7 +370,15 @@ def training_loop(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    env_choices = ["ant", "cartpole", "cheetah", "hopper", "inv_pend", "lander", "walker"] # alphabetical order now -jg
+    env_choices = [
+        "ant",
+        "cartpole",
+        "cheetah",
+        "hopper",
+        "inv_pend",
+        "lander",
+        "walker",
+    ]  # alphabetical order now -jg
     # env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
     agent_choices = discrete_agents + continous_agents
 

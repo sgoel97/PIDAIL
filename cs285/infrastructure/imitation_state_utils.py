@@ -86,9 +86,9 @@ def group_transitions_kmeans(transitions, cluster_config):
     clustering_model = KMeans(**cluster_config)
 
     # Fit clustering model on transitions
-    if isinstance(transitions, dict):
+    try:
         observations = transitions.obs
-    else:
+    except:
         observations = [t.obs for t in transitions]
 
     clustering_model.fit(observations)

@@ -5,7 +5,7 @@ dqn: { learning_starts: 10000 }
 
 cluster_config:
   {
-    cluster_type: "agglomerative",
+    cluster_type: "kmeans",
     agglomerative_clustering_kwargs:
       { metric: "l2", linkage: "average", distance_threshold: 0.2 },
     kmeans_clustering_kwargs:
@@ -14,7 +14,7 @@ cluster_config:
 
 prune_config:
   {
-    prune_type: "group",
+    prune_type: "action",
     group_filtering_kwargs:
       { size_threshold: 10, measure_cutoff: 80, method: "variance" },
     action_filtering_kwargs:
