@@ -9,7 +9,7 @@ from infrastructure.plotting_utils import *
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper"]
+    env_choices = ["cartpole", "ant", "pendulum", "inv_pend", "lander", "hopper", "walker"]
     agent_choices = ["bc", "sqil", "gail", "dqfd"]
 
     parser.add_argument(

@@ -247,7 +247,6 @@ class DQfDAgent:
         
         # Train DQN
         print("Training DQN")
-        train_start_time = time.time()
         obs, _ = self.env.reset()
         leftover_steps = total_steps - self.pretrain_steps
         curr_steps = 0

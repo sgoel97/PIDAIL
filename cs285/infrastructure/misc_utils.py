@@ -33,7 +33,7 @@ def get_env(env_name):
         "inv_pend": "InvertedPendulum-v4",
         "lander": "LunarLander-v2",
         "pendulum": "Pendulum-v1",
-        "walker": "Walker-v4", 
+        "walker": "Walker2d-v4",
     }
     return env_mapper[env_name]
 

@@ -14,7 +14,7 @@ def prune_group_mode_action(group):
 
 def prune_group_action_percentile(group, percentile=1):
     """
-    Only keeps states within a group that take the top percentile percentile action within the group - discrete
+    Only keeps states within a group that take the top percentile action within the group - discrete
     """
     actions = [g["acts"] for g in group]
 
@@ -50,7 +50,6 @@ def prune_group_action_percentile(group, percentile=1):
 def prune_group_continuous_action_percentile(group, percentile=99, agg="or"):
     """
     prunes groups based on actions - all or any of the remaining dimensions must be within a percentile of the median.
-
     """
     actions = [g["acts"] for g in group]
     action_dim = len(actions[0])

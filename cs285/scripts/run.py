@@ -10,7 +10,7 @@ from datetime import datetime
 
 from huggingface_sb3 import load_from_hub
 
-from stable_baselines3 import PPO, DQN
+from stable_baselines3 import PPO, DQN, sac
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import EvalCallback
@@ -39,8 +39,8 @@ from infrastructure.scripting_utils import *
 from infrastructure.imitation_agent_utils import *
 from infrastructure.custom_data_types import *
 
-discrete_agents = ["dqn", "sqil", "dagger", "bc", "gail", "dqfd"]
-continous_agents = ["sac", "td3", "gail", "dagger", "bc"]
+discrete_agents = ["dqn", "dagger", "bc", "gail", "dqfd"]
+continous_agents = ["sac", "td3", "gail", "dagger", "bc", "sqil"]
 cluster_types = ["agglomerative", "kmeans"]
 prune_types = ["group", "action", "outcome", "value"]
 """
@@ -63,7 +63,7 @@ def training_loop(
     timestamp=None,
 ):
     # Set up environment, hyperparameters, and data storage
-    total_steps = config["total_steps"]
+    # total_steps = config["total_steps"]
     gym_env_name = get_env(env_name)
 
     # Set up environment
@@ -89,6 +89,7 @@ def training_loop(
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
     agent_name = get_default_agent(agent, discrete, using_demos)
     check_agent_env(agent_name, discrete, discrete_agents, continous_agents)
+    total_steps = config[f"total_steps_{agent_name}"]
 
     # Set up logging
     if timestamp is None:
@@ -130,7 +131,7 @@ def training_loop(
 
         if prune:
             cluster_config = config["cluster_config"]
-            cluster_type = cluster_config["cluster_type"]
+            cluster_type = cluster_config[f"cluster_type_{agent_name}"]
             assert (
                 cluster_type in cluster_types
             ), f"cluster_type config must be one of {cluster_types}"
@@ -250,9 +251,10 @@ def training_loop(
         if agent_name == "sqil":
             sqil_trainer = sqil.SQIL(
                 venv=env,
-                demonstrations=rollouts,
+                demonstrations=transitions,
                 policy="MlpPolicy",
                 custom_logger=imitation_logger,
+                rl_algo_class=sac.SAC
             )
 
             if init_weight_file is not None:
@@ -287,7 +289,7 @@ def training_loop(
                 normalize_input_layer=RunningNorm,
             )
             gail_trainer = GAIL(
-                demonstrations=rollouts,
+                demonstrations=transitions,
                 demo_batch_size=256,
                 gen_replay_buffer_capacity=512,
                 n_disc_updates_per_round=8,
