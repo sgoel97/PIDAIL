@@ -19,6 +19,8 @@ from infrastructure.imitation_prune_utils import (
 )
 from infrastructure.custom_data_types import *
 
+from constants import *
+
 
 def create_imitation_trajectories(expert_file_path, custom=False):
     with open(expert_file_path, "rb") as f:
@@ -229,8 +231,10 @@ def prune_groups_by_value(env, transitions, groups, discrete, prune_config):
         else:
             q_values = []
             for transition in group:
-                q_value = q_estimator.policy.forward(torch.from_numpy(transition.obs).unsqueeze(0))
-                q_values.append(q_values)
+                t_obs = torch.from_numpy(transition.obs).unsqueeze(0).to(DEVICE)
+                t_act = torch.from_numpy(transition.action).unsqueeze(0).to(DEVICE)
+                q_value = q_estimator.policy.critic.q1_forward(t_obs, t_act).item()
+                q_values.append(q_value)
             threshold = np.percentile(q_values, prune_config["cutoff"])
             include_mask = np.array(q_values) >= threshold
         masks[i] = include_mask
