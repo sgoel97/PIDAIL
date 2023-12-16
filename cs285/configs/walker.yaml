@@ -1,15 +1,13 @@
-total_steps: 50000
-dqfd_pretrain_steps: 20000
+total_steps: 100000
 discrete: True
-max_steps_per_traj: 1000
 
 dqn: { learning_starts: 10000 }
 
 cluster_config:
   {
-    cluster_type: "agglomerative",
+    cluster_type: "kmeans",
     agglomerative_clustering_kwargs:
-      { metric: "l2", linkage: "average", distance_threshold: 4 },
+      { metric: "l2", linkage: "average", distance_threshold: 0.2 },
     kmeans_clustering_kwargs:
       { n_clusters: 100, max_iter: 300, algorithm: "lloyd" },
   }
@@ -22,9 +20,9 @@ prune_config:
     action_filtering_kwargs:
       {
         size_threshold: 10,
-        measure_cutoff: 50,
+        measure_cutoff: 80,
         method: "variance",
-        percentile: 20,
+        percentile: 50,
       },
     outcome_filtering_kwargs: { horizon: 10 },
   }

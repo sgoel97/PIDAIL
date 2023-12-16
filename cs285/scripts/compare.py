@@ -44,29 +44,15 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--eval_runs",
-        "-r", 
-        help="number of eval runs", 
-        default=20, 
+        "-r",
+        help="number of eval runs",
+        default=20,
     )
 
     args = parser.parse_args()
 
     config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
     timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
-
-    total_steps, unpruned_log_dir = training_loop(
-        args.env_name,
-        using_demos=True,
-        prune=False,
-        config=config,
-        agent=args.agent,
-        seed=args.seed,
-        timestamp=timestamp,
-        num_eval_runs=int(args.eval_runs), 
-    )
-    plot_npz(unpruned_log_dir + "/evaluations.npz", unpruned_log_dir)
-
-    unpruned_init_weight_file = Path(unpruned_log_dir) / "init_weights.pth"
 
     total_steps, pruned_log_dir = training_loop(
         args.env_name,
@@ -75,11 +61,25 @@ if __name__ == "__main__":
         config=config,
         agent=args.agent,
         seed=args.seed,
-        init_weight_file=unpruned_init_weight_file,
         timestamp=timestamp,
         num_eval_runs=int(args.eval_runs),
     )
     plot_npz(pruned_log_dir + "/evaluations.npz", pruned_log_dir)
+
+    pruned_init_weight_file = Path(pruned_log_dir) / "init_weights.pth"
+
+    total_steps, unpruned_log_dir = training_loop(
+        args.env_name,
+        using_demos=True,
+        prune=False,
+        config=config,
+        agent=args.agent,
+        seed=args.seed,
+        init_weight_file=pruned_init_weight_file,
+        timestamp=timestamp,
+        num_eval_runs=int(args.eval_runs),
+    )
+    plot_npz(unpruned_log_dir + "/evaluations.npz", unpruned_log_dir)
 
     log_dir = f"{os.getcwd()}/logs/{args.env_name}/{args.agent}_comparison_{timestamp}"
 

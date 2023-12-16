@@ -143,8 +143,8 @@ def training_loop(
                     transitions, cluster_config["kmeans_clustering_kwargs"]
                 )
 
-            # print("Before Filtering:\n############################")
-            # print_group_stats(groups)
+            print("Before Filtering:\n############################")
+            print_group_stats(groups)
 
             if prune_type == "group":
                 filtered_groups = filter_transition_groups(
@@ -166,8 +166,8 @@ def training_loop(
                     discrete,
                     prune_config["value_filtering_kwargs"],
                 )
-            # print("After Filtering:\n############################")
-            # print_group_stats(filtered_groups)
+            print("After Filtering:\n############################")
+            print_group_stats(filtered_groups)
 
             transitions = collate_transitions(filtered_groups)
 
@@ -313,7 +313,9 @@ def training_loop(
             agent = gail_trainer.policy
 
         if agent_name == "dqfd":
-            agent = DQfDAgent(dqfd_train_env, pretrain_steps=config["dqfd_pretrain_steps"])
+            agent = DQfDAgent(
+                dqfd_train_env, pretrain_steps=config["dqfd_pretrain_steps"]
+            )
             agent.set_log_dir(log_dir)
 
             def evaluate():
@@ -453,4 +455,8 @@ if __name__ == "__main__":
         num_eval_runs=int(args.eval_runs),
     )
 
-    plot_npz(log_dir + "/evaluations.npz", log_dir, show=args.graph)
+    plot_npz(
+        log_dir + "/evaluations.npz",
+        log_dir,
+        show=args.graph,
+    )
