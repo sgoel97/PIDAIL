@@ -28,12 +28,12 @@ def get_env(env_name):
     env_mapper = {
         "ant": "Ant-v4",
         "cartpole": "CartPole-v1",
-        "cheetah": "HalfCheetah-v4", 
+        "cheetah": "HalfCheetah-v4",
         "hopper": "Hopper-v4",
         "inv_pend": "InvertedPendulum-v4",
         "lander": "LunarLander-v2",
         "pendulum": "Pendulum-v1",
-        "walker": "Walker-v4", 
+        "walker": "Walker-v4",
     }
     return env_mapper[env_name]
 
@@ -47,7 +47,7 @@ def save_networks(using_demos, prune, env_name, agent):
     else:
         extension = "from_scratch"
 
-    data_path = Path(f"cs285/data/{env_name}/{int(time.time())}_{extension}/")
+    data_path = Path(f"pidail/data/{env_name}/{int(time.time())}_{extension}/")
     data_path.mkdir(parents=True, exist_ok=True)
 
     try:  # lol idk how to do this
@@ -64,5 +64,5 @@ def save_networks(using_demos, prune, env_name, agent):
 
 
 def format_time(secs):
-    td = timedelta(seconds = secs)
+    td = timedelta(seconds=secs)
     return str(td)

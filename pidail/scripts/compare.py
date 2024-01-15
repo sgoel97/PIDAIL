@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
+    config = make_config(f"{os.getcwd()}/pidail/configs/{args.env_name}.yaml")
     timestamp = datetime.now().strftime("%d_%H:%M:%S").replace("/", "_")
 
     total_steps, pruned_log_dir = training_loop(

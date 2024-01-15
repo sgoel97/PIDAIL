@@ -3,7 +3,7 @@ import sys
 import argparse
 import numpy as np
 
-sys.path.append(os.getcwd() + "/cs285/")
+sys.path.append(os.getcwd() + "/pidail/")
 
 import gymnasium as gym
 from datetime import datetime
@@ -113,7 +113,9 @@ def training_loop(
     episode_lengths = []
 
     if using_demos:
-        expert_file_path = f"{os.getcwd()}/cs285/experts/expert_data_{gym_env_name}.pkl"
+        expert_file_path = (
+            f"{os.getcwd()}/pidail/experts/expert_data_{gym_env_name}.pkl"
+        )
 
         prune_config = config["prune_config"]
         prune_type = prune_config["prune_type"]
@@ -443,7 +445,7 @@ if __name__ == "__main__":
     if not args.demos and args.prune:
         raise NotImplementedError("Can't use prune without expert demos")
 
-    config = make_config(f"{os.getcwd()}/cs285/configs/{args.env_name}.yaml")
+    config = make_config(f"{os.getcwd()}/pidail/configs/{args.env_name}.yaml")
 
     total_steps, log_dir = training_loop(
         args.env_name,
