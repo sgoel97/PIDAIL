@@ -8,8 +8,8 @@ dqn: { learning_starts: 10000 }
 
 cluster_config:
   {
-    cluster_type_gail: "agglomerative",
-    cluster_type_sqil: "kmeans",
+    cluster_type_gail: "kmeans",
+    cluster_type_sqil: "agglomerative",
     agglomerative_clustering_kwargs:
       { metric: "l2", linkage: "average", distance_threshold: 0.1 },
     kmeans_clustering_kwargs:
